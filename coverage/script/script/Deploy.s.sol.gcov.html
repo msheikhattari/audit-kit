@@ -1,0 +1,149 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - lcov.info - script/script/Deploy.s.sol</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+          <table width="100%" border=0 cellspacing=0 cellpadding=0>
+            <tr><td class="title">LCOV - code coverage report</td></tr>
+            <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+            <tr>
+              <td width="100%">
+                <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="10%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">script/script</a> - Deploy.s.sol<span style="font-size: 80%;"> (source / <a href="Deploy.s.sol.func-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="5%"></td>
+            <td width="5%" class="headerCovTableHead">Coverage</td>
+            <td width="5%" class="headerCovTableHead" title="Covered + Uncovered code">Total</td>
+            <td width="5%" class="headerCovTableHead" title="Exercised code only">Hit</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">lcov.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntryLo">0.0&nbsp;%</td>
+            <td class="headerCovTableEntry">25</td>
+            <td class="headerCovTableEntry">0</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test Date:</td>
+            <td class="headerValue">2024-03-29 17:48:27</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntryLo">0.0&nbsp;%</td>
+            <td class="headerCovTableEntry">1</td>
+            <td class="headerCovTableEntry">0</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntryLo">0.0&nbsp;%</td>
+            <td class="headerCovTableEntry">2</td>
+            <td class="headerCovTableEntry">0</td>
+          </tr>
+                  <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+          </table>
+
+          <table cellpadding=0 cellspacing=0 border=0>
+            <tr>
+              <td><br></td>
+            </tr>
+            <tr>
+              <td>
+<pre class="sourceHeading">             Branch data     Line data    Source code</pre>
+<pre class="source">
+<span id="L1"><span class="lineNum">       1</span>                 :             : // SPDX-License-Identifier: AGPL-3.0-only</span>
+<span id="L2"><span class="lineNum">       2</span>                 :             : pragma solidity 0.8.17;</span>
+<span id="L3"><span class="lineNum">       3</span>                 :             : </span>
+<span id="L4"><span class="lineNum">       4</span>                 :             : import &quot;forge-std/Script.sol&quot;;</span>
+<span id="L5"><span class="lineNum">       5</span>                 :             : </span>
+<span id="L6"><span class="lineNum">       6</span>                 :             : import {Factory, BorrowerDeployer, ERC20} from &quot;src/Factory.sol&quot;;</span>
+<span id="L7"><span class="lineNum">       7</span>                 :             : import {Lender} from &quot;src/Lender.sol&quot;;</span>
+<span id="L8"><span class="lineNum">       8</span>                 :             : import {RateModel} from &quot;src/RateModel.sol&quot;;</span>
+<span id="L9"><span class="lineNum">       9</span>                 :             : import {VolatilityOracle} from &quot;src/VolatilityOracle.sol&quot;;</span>
+<span id="L10"><span class="lineNum">      10</span>                 :             : </span>
+<span id="L11"><span class="lineNum">      11</span>                 :             : address constant GOVERNOR = 0x2bf8eA41aF0695D482C4aa23d4f8aD7E9023b890;</span>
+<span id="L12"><span class="lineNum">      12</span>                 :             : address constant RESERVE = 0xAd236E154cbC33cFDB6CD7A4BA04679d9fb74A8C;</span>
+<span id="L13"><span class="lineNum">      13</span>                 :             : </span>
+<span id="L14"><span class="lineNum">      14</span>                 :             : // Derived using https://github.com/0age/create2crunch/</span>
+<span id="L15"><span class="lineNum">      15</span>                 :             : bytes32 constant saltA = 0x0000000000000000000000000000000000000000aeeec55d74c86000021e5622;</span>
+<span id="L16"><span class="lineNum">      16</span>                 :             : bytes32 constant saltB = 0x00000000000000000000000000000000000000008a0ad7466accc00001d49926;</span>
+<span id="L17"><span class="lineNum">      17</span>                 :             : bytes32 constant saltC = 0x0000000000000000000000000000000000000000d36d6b3f5afc00000074870e;</span>
+<span id="L18"><span class="lineNum">      18</span>                 :             : bytes32 constant saltD = 0x00000000000000000000000000000000000000005f2f31da9d94e0001ab8274a;</span>
+<span id="L19"><span class="lineNum">      19</span>                 :             : </span>
+<span id="L20"><span class="lineNum">      20</span>                 :             : contract DeployScript is Script {</span>
+<span id="L21"><span class="lineNum">      21</span>                 :<span class="tlaUNC tlaBgUNC">           0 :     function run() external {</span></span>
+<span id="L22"><span class="lineNum">      22</span>                 :<span class="tlaUNC">           0 :         bytes32 ichVolatilityOracle = hashInitCode(type(VolatilityOracle).creationCode);</span></span>
+<span id="L23"><span class="lineNum">      23</span>                 :<span class="tlaUNC">           0 :         bytes32 ichRateModel = hashInitCode(type(RateModel).creationCode);</span></span>
+<span id="L24"><span class="lineNum">      24</span>                 :<span class="tlaUNC">           0 :         bytes32 ichBorrowerDeployer = hashInitCode(type(BorrowerDeployer).creationCode);</span></span>
+<span id="L25"><span class="lineNum">      25</span>                 :             : </span>
+<span id="L26"><span class="lineNum">      26</span>                 :<span class="tlaUNC">           0 :         address addrVolatilityOracle = computeCreate2Address(saltA, ichVolatilityOracle);</span></span>
+<span id="L27"><span class="lineNum">      27</span>                 :<span class="tlaUNC">           0 :         address addrRateModel = computeCreate2Address(saltB, ichRateModel);</span></span>
+<span id="L28"><span class="lineNum">      28</span>                 :<span class="tlaUNC">           0 :         address addrBorrowerDeployer = computeCreate2Address(saltC, ichBorrowerDeployer);</span></span>
+<span id="L29"><span class="lineNum">      29</span>                 :             : </span>
+<span id="L30"><span class="lineNum">      30</span>                 :<span class="tlaUNC">           0 :         bytes32 ichFactory = hashInitCode(</span></span>
+<span id="L31"><span class="lineNum">      31</span>                 :             :             type(Factory).creationCode,</span>
+<span id="L32"><span class="lineNum">      32</span>                 :             :             abi.encode(GOVERNOR, RESERVE, addrVolatilityOracle, addrBorrowerDeployer, addrRateModel)</span>
+<span id="L33"><span class="lineNum">      33</span>                 :             :         );</span>
+<span id="L34"><span class="lineNum">      34</span>                 :<span class="tlaUNC">           0 :         address addrFactory = computeCreate2Address(saltD, ichFactory);</span></span>
+<span id="L35"><span class="lineNum">      35</span>                 :             : </span>
+<span id="L36"><span class="lineNum">      36</span>                 :<span class="tlaUNC">           0 :         console2.log(&quot;\ninitCode hashes&quot;);</span></span>
+<span id="L37"><span class="lineNum">      37</span>                 :<span class="tlaUNC">           0 :         console2.log(&quot;\tVolatilityOracle:\t&quot;, vm.toString(ichVolatilityOracle));</span></span>
+<span id="L38"><span class="lineNum">      38</span>                 :<span class="tlaUNC">           0 :         console2.log(&quot;\tRateModel:\t\t&quot;, vm.toString(ichRateModel));</span></span>
+<span id="L39"><span class="lineNum">      39</span>                 :<span class="tlaUNC">           0 :         console2.log(&quot;\tBorrowerDeployer:\t&quot;, vm.toString(ichBorrowerDeployer));</span></span>
+<span id="L40"><span class="lineNum">      40</span>                 :<span class="tlaUNC">           0 :         console2.log(&quot;\tFactory:\t\t&quot;, vm.toString(ichFactory));</span></span>
+<span id="L41"><span class="lineNum">      41</span>                 :             : </span>
+<span id="L42"><span class="lineNum">      42</span>                 :<span class="tlaUNC">           0 :         console2.log(&quot;\naddresses&quot;);</span></span>
+<span id="L43"><span class="lineNum">      43</span>                 :<span class="tlaUNC">           0 :         console2.log(&quot;\tVolatilityOracle:\t&quot;, addrVolatilityOracle);</span></span>
+<span id="L44"><span class="lineNum">      44</span>                 :<span class="tlaUNC">           0 :         console2.log(&quot;\tRateModel:\t\t&quot;, addrRateModel);</span></span>
+<span id="L45"><span class="lineNum">      45</span>                 :<span class="tlaUNC">           0 :         console2.log(&quot;\tBorrowerDeployer:\t&quot;, addrBorrowerDeployer);</span></span>
+<span id="L46"><span class="lineNum">      46</span>                 :<span class="tlaUNC">           0 :         console2.log(&quot;\tFactory:\t\t&quot;, addrFactory);</span></span>
+<span id="L47"><span class="lineNum">      47</span>                 :             : </span>
+<span id="L48"><span class="lineNum">      48</span>                 :<span class="tlaUNC">           0 :         vm.startBroadcast(vm.envUint(&quot;PRIVATE_KEY&quot;));</span></span>
+<span id="L49"><span class="lineNum">      49</span>                 :             : </span>
+<span id="L50"><span class="lineNum">      50</span>                 :<span class="tlaUNC">           0 :         VolatilityOracle oracle = new VolatilityOracle{salt: saltA}();</span></span>
+<span id="L51"><span class="lineNum">      51</span>                 :<span class="tlaUNC">           0 :         RateModel rateModel = new RateModel{salt: saltB}();</span></span>
+<span id="L52"><span class="lineNum">      52</span>                 :<span class="tlaUNC">           0 :         BorrowerDeployer borrowerDeployer = new BorrowerDeployer{salt: saltC}();</span></span>
+<span id="L53"><span class="lineNum">      53</span>                 :<span class="tlaUNC">           0 :         Factory factory = new Factory{salt: saltD}({</span></span>
+<span id="L54"><span class="lineNum">      54</span>                 :             :             governor: GOVERNOR,</span>
+<span id="L55"><span class="lineNum">      55</span>                 :             :             reserve: RESERVE,</span>
+<span id="L56"><span class="lineNum">      56</span>                 :             :             oracle: oracle,</span>
+<span id="L57"><span class="lineNum">      57</span>                 :             :             borrowerDeployer: borrowerDeployer,</span>
+<span id="L58"><span class="lineNum">      58</span>                 :             :             defaultRateModel: rateModel</span>
+<span id="L59"><span class="lineNum">      59</span>                 :             :         });</span>
+<span id="L60"><span class="lineNum">      60</span>                 :             : </span>
+<span id="L61"><span class="lineNum">      61</span>                 :<span class="tlaUNC">           0 :         vm.stopBroadcast();</span></span>
+<span id="L62"><span class="lineNum">      62</span>         [<span class="tlaUNC" title="Branch 0 was not executed"> # </span><span class="tlaUNC" title="Branch 1 was not executed"> # </span>]:<span class="tlaUNC">           0 :         assert(address(factory) == addrFactory);</span></span>
+<span id="L63"><span class="lineNum">      63</span>                 :             :     }</span>
+<span id="L64"><span class="lineNum">      64</span>                 :             : }</span>
+        </pre>
+              </td>
+            </tr>
+          </table>
+          <br>
+
+          <table width="100%" border=0 cellspacing=0 cellpadding=0>
+            <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+            <tr><td class="versionInfo">Generated by: <a href="https://github.com//linux-test-project/lcov" target="_parent">LCOV version 2.0-1</a></td></tr>
+          </table>
+          <br>
+
+</body>
+</html>

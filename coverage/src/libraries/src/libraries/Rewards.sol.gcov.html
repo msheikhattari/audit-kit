@@ -1,0 +1,239 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - lcov.info - src/libraries/src/libraries/Rewards.sol</title>
+  <link rel="stylesheet" type="text/css" href="../../../../gcov.css">
+</head>
+
+<body>
+
+          <table width="100%" border=0 cellspacing=0 cellpadding=0>
+            <tr><td class="title">LCOV - code coverage report</td></tr>
+            <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+
+            <tr>
+              <td width="100%">
+                <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="10%" class="headerValue"><a href="../../../../index.html">top level</a> - <a href="index.html">src/libraries/src/libraries</a> - Rewards.sol<span style="font-size: 80%;"> (source / <a href="Rewards.sol.func-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="5%"></td>
+            <td width="5%" class="headerCovTableHead">Coverage</td>
+            <td width="5%" class="headerCovTableHead" title="Covered + Uncovered code">Total</td>
+            <td width="5%" class="headerCovTableHead" title="Exercised code only">Hit</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">lcov.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntryHi">100.0&nbsp;%</td>
+            <td class="headerCovTableEntry">28</td>
+            <td class="headerCovTableEntry">28</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test Date:</td>
+            <td class="headerValue">2024-03-29 17:48:27</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntryHi">100.0&nbsp;%</td>
+            <td class="headerCovTableEntry">10</td>
+            <td class="headerCovTableEntry">10</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntryHi">-</td>
+            <td class="headerCovTableEntry">0</td>
+            <td class="headerCovTableEntry">0</td>
+          </tr>
+                  <tr><td><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+          </table>
+
+          <table cellpadding=0 cellspacing=0 border=0>
+            <tr>
+              <td><br></td>
+            </tr>
+            <tr>
+              <td>
+<pre class="sourceHeading">             Branch data     Line data    Source code</pre>
+<pre class="source">
+<span id="L1"><span class="lineNum">       1</span>                 :             : // SPDX-License-Identifier: AGPL-3.0-only</span>
+<span id="L2"><span class="lineNum">       2</span>                 :             : pragma solidity 0.8.17;</span>
+<span id="L3"><span class="lineNum">       3</span>                 :             : </span>
+<span id="L4"><span class="lineNum">       4</span>                 :             : import {log2Up, exp2} from &quot;./Log2.sol&quot;;</span>
+<span id="L5"><span class="lineNum">       5</span>                 :             : </span>
+<span id="L6"><span class="lineNum">       6</span>                 :             : /// @title Rewards</span>
+<span id="L7"><span class="lineNum">       7</span>                 :             : /// @notice Implements logic for staking rewards</span>
+<span id="L8"><span class="lineNum">       8</span>                 :             : /// @author Aloe Labs, Inc.</span>
+<span id="L9"><span class="lineNum">       9</span>                 :             : /// @author Inspired by [Yield Protocol](https://github.com/yieldprotocol/yield-utils-v2/blob/main/src/token/ERC20Rewards.sol)</span>
+<span id="L10"><span class="lineNum">      10</span>                 :             : library Rewards {</span>
+<span id="L11"><span class="lineNum">      11</span>                 :             :     event RewardsRateSet(uint56 rate);</span>
+<span id="L12"><span class="lineNum">      12</span>                 :             : </span>
+<span id="L13"><span class="lineNum">      13</span>                 :             :     event RewardsClaimed(address indexed user, uint112 amount);</span>
+<span id="L14"><span class="lineNum">      14</span>                 :             : </span>
+<span id="L15"><span class="lineNum">      15</span>                 :             :     struct PoolState {</span>
+<span id="L16"><span class="lineNum">      16</span>                 :             :         // Accumulated rewards per token, scaled up by 1e16</span>
+<span id="L17"><span class="lineNum">      17</span>                 :             :         uint144 accumulated;</span>
+<span id="L18"><span class="lineNum">      18</span>                 :             :         // Last time `accumulated` was updated</span>
+<span id="L19"><span class="lineNum">      19</span>                 :             :         uint32 lastUpdated;</span>
+<span id="L20"><span class="lineNum">      20</span>                 :             :         // The rewards rate, specified as [token units per second]</span>
+<span id="L21"><span class="lineNum">      21</span>                 :             :         uint56 rate;</span>
+<span id="L22"><span class="lineNum">      22</span>                 :             :         // log2Up(totalSupply)</span>
+<span id="L23"><span class="lineNum">      23</span>                 :             :         int24 log2TotalSupply;</span>
+<span id="L24"><span class="lineNum">      24</span>                 :             :     }</span>
+<span id="L25"><span class="lineNum">      25</span>                 :             : </span>
+<span id="L26"><span class="lineNum">      26</span>                 :             :     struct UserState {</span>
+<span id="L27"><span class="lineNum">      27</span>                 :             :         // Rewards earned by the user up until the checkpoint</span>
+<span id="L28"><span class="lineNum">      28</span>                 :             :         uint112 earned;</span>
+<span id="L29"><span class="lineNum">      29</span>                 :             :         // `poolState.accumulated` the last time `userState` was updated</span>
+<span id="L30"><span class="lineNum">      30</span>                 :             :         uint144 checkpoint;</span>
+<span id="L31"><span class="lineNum">      31</span>                 :             :     }</span>
+<span id="L32"><span class="lineNum">      32</span>                 :             : </span>
+<span id="L33"><span class="lineNum">      33</span>                 :             :     struct Storage {</span>
+<span id="L34"><span class="lineNum">      34</span>                 :             :         PoolState poolState;</span>
+<span id="L35"><span class="lineNum">      35</span>                 :             :         mapping(address =&gt; UserState) userStates;</span>
+<span id="L36"><span class="lineNum">      36</span>                 :             :     }</span>
+<span id="L37"><span class="lineNum">      37</span>                 :             : </span>
+<span id="L38"><span class="lineNum">      38</span>                 :             :     bytes32 private constant _REWARDS_SLOT = keccak256(&quot;aloe.ii.rewards&quot;);</span>
+<span id="L39"><span class="lineNum">      39</span>                 :             : </span>
+<span id="L40"><span class="lineNum">      40</span>                 :             :     /**</span>
+<span id="L41"><span class="lineNum">      41</span>                 :             :      * @notice Sets the pool's rewards rate. May be 0.</span>
+<span id="L42"><span class="lineNum">      42</span>                 :             :      * @param rate The rewards rate, specified as [token units per second]. Keep between 10^19 and 10^24</span>
+<span id="L43"><span class="lineNum">      43</span>                 :             :      * token units per year for smooth operation -- between 10 and 1 million tokens, assuming 18 decimals.</span>
+<span id="L44"><span class="lineNum">      44</span>                 :             :      */</span>
+<span id="L45"><span class="lineNum">      45</span>                 :<span class="tlaGNC tlaBgGNC">       36869 :     function setRate(uint56 rate) internal {</span></span>
+<span id="L46"><span class="lineNum">      46</span>                 :<span class="tlaGNC">       36869 :         Storage storage store = _getStorage();</span></span>
+<span id="L47"><span class="lineNum">      47</span>                 :<span class="tlaGNC">       36869 :         PoolState memory poolState = store.poolState;</span></span>
+<span id="L48"><span class="lineNum">      48</span>                 :             : </span>
+<span id="L49"><span class="lineNum">      49</span>                 :             :         // Update each component of `poolState`, making sure to `_accumulate` first</span>
+<span id="L50"><span class="lineNum">      50</span>                 :<span class="tlaGNC">       36869 :         poolState.accumulated = _accumulate(poolState);</span></span>
+<span id="L51"><span class="lineNum">      51</span>                 :<span class="tlaGNC">       36869 :         poolState.lastUpdated = uint32(block.timestamp);</span></span>
+<span id="L52"><span class="lineNum">      52</span>                 :<span class="tlaGNC">       36869 :         poolState.rate = rate;</span></span>
+<span id="L53"><span class="lineNum">      53</span>                 :             :         // poolState.log2TotalSupply is unchanged</span>
+<span id="L54"><span class="lineNum">      54</span>                 :             : </span>
+<span id="L55"><span class="lineNum">      55</span>                 :<span class="tlaGNC">       36869 :         store.poolState = poolState;</span></span>
+<span id="L56"><span class="lineNum">      56</span>                 :<span class="tlaGNC">       36869 :         emit RewardsRateSet(rate);</span></span>
+<span id="L57"><span class="lineNum">      57</span>                 :             :     }</span>
+<span id="L58"><span class="lineNum">      58</span>                 :             : </span>
+<span id="L59"><span class="lineNum">      59</span>                 :<span class="tlaGNC">       32769 :     function claim(</span></span>
+<span id="L60"><span class="lineNum">      60</span>                 :             :         Storage storage store,</span>
+<span id="L61"><span class="lineNum">      61</span>                 :             :         uint144 accumulated,</span>
+<span id="L62"><span class="lineNum">      62</span>                 :             :         address user,</span>
+<span id="L63"><span class="lineNum">      63</span>                 :             :         uint256 balance</span>
+<span id="L64"><span class="lineNum">      64</span>                 :             :     ) internal returns (uint112 earned) {</span>
+<span id="L65"><span class="lineNum">      65</span>                 :<span class="tlaGNC">       32769 :         UserState memory userState = previewUserState(store, accumulated, user, balance);</span></span>
+<span id="L66"><span class="lineNum">      66</span>                 :             : </span>
+<span id="L67"><span class="lineNum">      67</span>                 :<span class="tlaGNC">       32769 :         earned = userState.earned;</span></span>
+<span id="L68"><span class="lineNum">      68</span>                 :<span class="tlaGNC">       32769 :         userState.earned = 0;</span></span>
+<span id="L69"><span class="lineNum">      69</span>                 :             : </span>
+<span id="L70"><span class="lineNum">      70</span>                 :<span class="tlaGNC">       32769 :         store.userStates[user] = userState;</span></span>
+<span id="L71"><span class="lineNum">      71</span>                 :<span class="tlaGNC">       32769 :         emit RewardsClaimed(user, earned);</span></span>
+<span id="L72"><span class="lineNum">      72</span>                 :             :     }</span>
+<span id="L73"><span class="lineNum">      73</span>                 :             : </span>
+<span id="L74"><span class="lineNum">      74</span>                 :             :     /**</span>
+<span id="L75"><span class="lineNum">      75</span>                 :             :      * @notice Ensures that changes in the pool's `totalSupply` don't mess up rewards accounting. Should</span>
+<span id="L76"><span class="lineNum">      76</span>                 :             :      * be called anytime `totalSupply` changes.</span>
+<span id="L77"><span class="lineNum">      77</span>                 :             :      * @dev Use `Rewards.pre()` to easily obtain the first two arguments</span>
+<span id="L78"><span class="lineNum">      78</span>                 :             :      * @param store The rewards storage pointer</span>
+<span id="L79"><span class="lineNum">      79</span>                 :             :      * @param accumulated Up-to-date `poolState.accumulated`, i.e. the output of `_accumulate`</span>
+<span id="L80"><span class="lineNum">      80</span>                 :             :      * @param totalSupply The `totalSupply` after any mints/burns</span>
+<span id="L81"><span class="lineNum">      81</span>                 :             :      */</span>
+<span id="L82"><span class="lineNum">      82</span>                 :<span class="tlaGNC">      163674 :     function updatePoolState(Storage storage store, uint144 accumulated, uint256 totalSupply) internal {</span></span>
+<span id="L83"><span class="lineNum">      83</span>                 :<span class="tlaGNC">      163674 :         store.poolState = previewPoolState(store, accumulated, totalSupply);</span></span>
+<span id="L84"><span class="lineNum">      84</span>                 :             :     }</span>
+<span id="L85"><span class="lineNum">      85</span>                 :             : </span>
+<span id="L86"><span class="lineNum">      86</span>                 :             :     /**</span>
+<span id="L87"><span class="lineNum">      87</span>                 :             :      * @notice Tracks how much reward a `user` earned while holding a particular `balance`. Should be</span>
+<span id="L88"><span class="lineNum">      88</span>                 :             :      * called anytime their balance changes.</span>
+<span id="L89"><span class="lineNum">      89</span>                 :             :      * @dev Use `Rewards.pre()` to easily obtain the first two arguments</span>
+<span id="L90"><span class="lineNum">      90</span>                 :             :      * @param store The rewards storage pointer</span>
+<span id="L91"><span class="lineNum">      91</span>                 :             :      * @param accumulated Up-to-date `poolState.accumulated`, i.e. the output of `_accumulate`</span>
+<span id="L92"><span class="lineNum">      92</span>                 :             :      * @param user The user whose balance (# of shares) is about to change</span>
+<span id="L93"><span class="lineNum">      93</span>                 :             :      * @param balance The user's balance (# of shares) -- before it changes</span>
+<span id="L94"><span class="lineNum">      94</span>                 :             :      */</span>
+<span id="L95"><span class="lineNum">      95</span>                 :<span class="tlaGNC">      257876 :     function updateUserState(Storage storage store, uint144 accumulated, address user, uint256 balance) internal {</span></span>
+<span id="L96"><span class="lineNum">      96</span>                 :<span class="tlaGNC">      257876 :         store.userStates[user] = previewUserState(store, accumulated, user, balance);</span></span>
+<span id="L97"><span class="lineNum">      97</span>                 :             :     }</span>
+<span id="L98"><span class="lineNum">      98</span>                 :             : </span>
+<span id="L99"><span class="lineNum">      99</span>                 :<span class="tlaGNC">      163674 :     function previewPoolState(</span></span>
+<span id="L100"><span class="lineNum">     100</span>                 :             :         Storage storage store,</span>
+<span id="L101"><span class="lineNum">     101</span>                 :             :         uint144 accumulated,</span>
+<span id="L102"><span class="lineNum">     102</span>                 :             :         uint256 totalSupply</span>
+<span id="L103"><span class="lineNum">     103</span>                 :             :     ) internal view returns (PoolState memory poolState) {</span>
+<span id="L104"><span class="lineNum">     104</span>                 :             :         unchecked {</span>
+<span id="L105"><span class="lineNum">     105</span>                 :<span class="tlaGNC">      163674 :             poolState = store.poolState;</span></span>
+<span id="L106"><span class="lineNum">     106</span>                 :             : </span>
+<span id="L107"><span class="lineNum">     107</span>                 :<span class="tlaGNC">      163674 :             poolState.accumulated = accumulated;</span></span>
+<span id="L108"><span class="lineNum">     108</span>                 :<span class="tlaGNC">      163674 :             poolState.lastUpdated = uint32(block.timestamp);</span></span>
+<span id="L109"><span class="lineNum">     109</span>                 :<span class="tlaGNC">      163674 :             poolState.log2TotalSupply = int24(log2Up(totalSupply));</span></span>
+<span id="L110"><span class="lineNum">     110</span>                 :             :             // poolState.rate is unchanged</span>
+<span id="L111"><span class="lineNum">     111</span>                 :             :         }</span>
+<span id="L112"><span class="lineNum">     112</span>                 :             :     }</span>
+<span id="L113"><span class="lineNum">     113</span>                 :             : </span>
+<span id="L114"><span class="lineNum">     114</span>                 :<span class="tlaGNC">      474968 :     function previewUserState(</span></span>
+<span id="L115"><span class="lineNum">     115</span>                 :             :         Storage storage store,</span>
+<span id="L116"><span class="lineNum">     116</span>                 :             :         uint144 accumulated,</span>
+<span id="L117"><span class="lineNum">     117</span>                 :             :         address user,</span>
+<span id="L118"><span class="lineNum">     118</span>                 :             :         uint256 balance</span>
+<span id="L119"><span class="lineNum">     119</span>                 :             :     ) internal view returns (UserState memory userState) {</span>
+<span id="L120"><span class="lineNum">     120</span>                 :             :         unchecked {</span>
+<span id="L121"><span class="lineNum">     121</span>                 :<span class="tlaGNC">      474968 :             userState = store.userStates[user];</span></span>
+<span id="L122"><span class="lineNum">     122</span>                 :             : </span>
+<span id="L123"><span class="lineNum">     123</span>                 :<span class="tlaGNC">      474968 :             userState.earned += uint112((balance * (accumulated - userState.checkpoint)) / 1e16);</span></span>
+<span id="L124"><span class="lineNum">     124</span>                 :<span class="tlaGNC">      474968 :             userState.checkpoint = accumulated;</span></span>
+<span id="L125"><span class="lineNum">     125</span>                 :             :         }</span>
+<span id="L126"><span class="lineNum">     126</span>                 :             :     }</span>
+<span id="L127"><span class="lineNum">     127</span>                 :             : </span>
+<span id="L128"><span class="lineNum">     128</span>                 :<span class="tlaGNC">        8192 :     function getRate() internal view returns (uint56) {</span></span>
+<span id="L129"><span class="lineNum">     129</span>                 :<span class="tlaGNC">        8192 :         return _getStorage().poolState.rate;</span></span>
+<span id="L130"><span class="lineNum">     130</span>                 :             :     }</span>
+<span id="L131"><span class="lineNum">     131</span>                 :             : </span>
+<span id="L132"><span class="lineNum">     132</span>                 :             :     /// @dev Returns arguments to be used in `updatePoolState` and `updateUserState`. No good semantic</span>
+<span id="L133"><span class="lineNum">     133</span>                 :             :     /// meaning here, just a coincidence that both functions need this information.</span>
+<span id="L134"><span class="lineNum">     134</span>                 :<span class="tlaGNC">      452708 :     function load() internal view returns (Storage storage store, uint144 accumulator) {</span></span>
+<span id="L135"><span class="lineNum">     135</span>                 :<span class="tlaGNC">      452708 :         store = _getStorage();</span></span>
+<span id="L136"><span class="lineNum">     136</span>                 :<span class="tlaGNC">      452708 :         accumulator = _accumulate(store.poolState);</span></span>
+<span id="L137"><span class="lineNum">     137</span>                 :             :     }</span>
+<span id="L138"><span class="lineNum">     138</span>                 :             : </span>
+<span id="L139"><span class="lineNum">     139</span>                 :             :     /// @dev Accumulates rewards based on the current `rate` and time elapsed since last update</span>
+<span id="L140"><span class="lineNum">     140</span>                 :<span class="tlaGNC">      489577 :     function _accumulate(PoolState memory poolState) private view returns (uint144) {</span></span>
+<span id="L141"><span class="lineNum">     141</span>                 :             :         unchecked {</span>
+<span id="L142"><span class="lineNum">     142</span>                 :<span class="tlaGNC">      489577 :             uint256 deltaT = block.timestamp - poolState.lastUpdated;</span></span>
+<span id="L143"><span class="lineNum">     143</span>                 :<span class="tlaGNC">      489577 :             return poolState.accumulated + uint144((1e16 * deltaT * poolState.rate) / exp2(poolState.log2TotalSupply));</span></span>
+<span id="L144"><span class="lineNum">     144</span>                 :             :         }</span>
+<span id="L145"><span class="lineNum">     145</span>                 :             :     }</span>
+<span id="L146"><span class="lineNum">     146</span>                 :             : </span>
+<span id="L147"><span class="lineNum">     147</span>                 :             :     /// @dev Diamond-pattern-style storage getter</span>
+<span id="L148"><span class="lineNum">     148</span>                 :<span class="tlaGNC">      497769 :     function _getStorage() private pure returns (Storage storage store) {</span></span>
+<span id="L149"><span class="lineNum">     149</span>                 :<span class="tlaGNC">      497769 :         bytes32 position = _REWARDS_SLOT;</span></span>
+<span id="L150"><span class="lineNum">     150</span>                 :             :         assembly (&quot;memory-safe&quot;) {</span>
+<span id="L151"><span class="lineNum">     151</span>                 :<span class="tlaGNC">      497769 :             store.slot := position</span></span>
+<span id="L152"><span class="lineNum">     152</span>                 :             :         }</span>
+<span id="L153"><span class="lineNum">     153</span>                 :             :     }</span>
+<span id="L154"><span class="lineNum">     154</span>                 :             : }</span>
+        </pre>
+              </td>
+            </tr>
+          </table>
+          <br>
+
+          <table width="100%" border=0 cellspacing=0 cellpadding=0>
+            <tr><td class="ruler"><img src="../../../../glass.png" width=3 height=3 alt=""></td></tr>
+            <tr><td class="versionInfo">Generated by: <a href="https://github.com//linux-test-project/lcov" target="_parent">LCOV version 2.0-1</a></td></tr>
+          </table>
+          <br>
+
+</body>
+</html>

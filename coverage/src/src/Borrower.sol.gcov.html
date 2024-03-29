@@ -1,0 +1,641 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - lcov.info - src/src/Borrower.sol</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+          <table width="100%" border=0 cellspacing=0 cellpadding=0>
+            <tr><td class="title">LCOV - code coverage report</td></tr>
+            <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+            <tr>
+              <td width="100%">
+                <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="10%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">src/src</a> - Borrower.sol<span style="font-size: 80%;"> (source / <a href="Borrower.sol.func-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="5%"></td>
+            <td width="5%" class="headerCovTableHead">Coverage</td>
+            <td width="5%" class="headerCovTableHead" title="Covered + Uncovered code">Total</td>
+            <td width="5%" class="headerCovTableHead" title="Exercised code only">Hit</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">lcov.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntryHi">98.2&nbsp;%</td>
+            <td class="headerCovTableEntry">109</td>
+            <td class="headerCovTableEntry">107</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test Date:</td>
+            <td class="headerValue">2024-03-29 17:48:27</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntryMed">89.5&nbsp;%</td>
+            <td class="headerCovTableEntry">19</td>
+            <td class="headerCovTableEntry">17</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="headerItem">Branches:</td>
+            <td class="headerCovTableEntryMed">75.0&nbsp;%</td>
+            <td class="headerCovTableEntry">44</td>
+            <td class="headerCovTableEntry">33</td>
+          </tr>
+                  <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+          </table>
+
+          <table cellpadding=0 cellspacing=0 border=0>
+            <tr>
+              <td><br></td>
+            </tr>
+            <tr>
+              <td>
+<pre class="sourceHeading">             Branch data     Line data    Source code</pre>
+<pre class="source">
+<span id="L1"><span class="lineNum">       1</span>                 :             : // SPDX-License-Identifier: AGPL-3.0-only</span>
+<span id="L2"><span class="lineNum">       2</span>                 :             : pragma solidity 0.8.17;</span>
+<span id="L3"><span class="lineNum">       3</span>                 :             : </span>
+<span id="L4"><span class="lineNum">       4</span>                 :             : import {ImmutableArgs} from &quot;clones-with-immutable-args/ImmutableArgs.sol&quot;;</span>
+<span id="L5"><span class="lineNum">       5</span>                 :             : import {Math} from &quot;openzeppelin-contracts/contracts/utils/math/Math.sol&quot;;</span>
+<span id="L6"><span class="lineNum">       6</span>                 :             : import {ERC20, SafeTransferLib} from &quot;solmate/utils/SafeTransferLib.sol&quot;;</span>
+<span id="L7"><span class="lineNum">       7</span>                 :             : import {IUniswapV3MintCallback} from &quot;v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol&quot;;</span>
+<span id="L8"><span class="lineNum">       8</span>                 :             : import {IUniswapV3Pool} from &quot;v3-core/contracts/interfaces/IUniswapV3Pool.sol&quot;;</span>
+<span id="L9"><span class="lineNum">       9</span>                 :             : </span>
+<span id="L10"><span class="lineNum">      10</span>                 :             : import {LIQUIDATION_GRACE_PERIOD} from &quot;./libraries/constants/Constants.sol&quot;;</span>
+<span id="L11"><span class="lineNum">      11</span>                 :             : import {Q128} from &quot;./libraries/constants/Q.sol&quot;;</span>
+<span id="L12"><span class="lineNum">      12</span>                 :             : import {BalanceSheet, Assets, Prices} from &quot;./libraries/BalanceSheet.sol&quot;;</span>
+<span id="L13"><span class="lineNum">      13</span>                 :             : import {LiquidityAmounts} from &quot;./libraries/LiquidityAmounts.sol&quot;;</span>
+<span id="L14"><span class="lineNum">      14</span>                 :             : import {square, mulDiv128} from &quot;./libraries/MulDiv.sol&quot;;</span>
+<span id="L15"><span class="lineNum">      15</span>                 :             : import {extract} from &quot;./libraries/Positions.sol&quot;;</span>
+<span id="L16"><span class="lineNum">      16</span>                 :             : import {TickMath} from &quot;./libraries/TickMath.sol&quot;;</span>
+<span id="L17"><span class="lineNum">      17</span>                 :             : </span>
+<span id="L18"><span class="lineNum">      18</span>                 :             : import {Factory} from &quot;./Factory.sol&quot;;</span>
+<span id="L19"><span class="lineNum">      19</span>                 :             : import {Lender} from &quot;./Lender.sol&quot;;</span>
+<span id="L20"><span class="lineNum">      20</span>                 :             : import {VolatilityOracle} from &quot;./VolatilityOracle.sol&quot;;</span>
+<span id="L21"><span class="lineNum">      21</span>                 :             : </span>
+<span id="L22"><span class="lineNum">      22</span>                 :             : interface ILiquidator {</span>
+<span id="L23"><span class="lineNum">      23</span>                 :             :     receive() external payable;</span>
+<span id="L24"><span class="lineNum">      24</span>                 :             : </span>
+<span id="L25"><span class="lineNum">      25</span>                 :             :     function swap1For0(bytes calldata data, uint256 received1, uint256 expected0) external;</span>
+<span id="L26"><span class="lineNum">      26</span>                 :             : </span>
+<span id="L27"><span class="lineNum">      27</span>                 :             :     function swap0For1(bytes calldata data, uint256 received0, uint256 expected1) external;</span>
+<span id="L28"><span class="lineNum">      28</span>                 :             : }</span>
+<span id="L29"><span class="lineNum">      29</span>                 :             : </span>
+<span id="L30"><span class="lineNum">      30</span>                 :             : interface IManager {</span>
+<span id="L31"><span class="lineNum">      31</span>                 :             :     /**</span>
+<span id="L32"><span class="lineNum">      32</span>                 :             :      * @notice Gives the `IManager` full control of the `Borrower`. Called within `Borrower.modify`.</span>
+<span id="L33"><span class="lineNum">      33</span>                 :             :      * @dev In most cases, you'll want to verify that `msg.sender` is, in fact, a `Borrower` using</span>
+<span id="L34"><span class="lineNum">      34</span>                 :             :      * `factory.isBorrower(msg.sender)`.</span>
+<span id="L35"><span class="lineNum">      35</span>                 :             :      * @param data Encoded parameters that were passed to `Borrower.modify`</span>
+<span id="L36"><span class="lineNum">      36</span>                 :             :      * @param owner The owner of the `Borrower`</span>
+<span id="L37"><span class="lineNum">      37</span>                 :             :      * @param positions The `Borrower`'s current Uniswap positions. You can convert them to an array using</span>
+<span id="L38"><span class="lineNum">      38</span>                 :             :      * `Positions.extract`</span>
+<span id="L39"><span class="lineNum">      39</span>                 :             :      * @return Updated positions, encoded using `Positions.zip`. Return 0 if you don't wish to make any changes.</span>
+<span id="L40"><span class="lineNum">      40</span>                 :             :      */</span>
+<span id="L41"><span class="lineNum">      41</span>                 :             :     function callback(bytes calldata data, address owner, uint208 positions) external returns (uint208);</span>
+<span id="L42"><span class="lineNum">      42</span>                 :             : }</span>
+<span id="L43"><span class="lineNum">      43</span>                 :             : </span>
+<span id="L44"><span class="lineNum">      44</span>                 :             : /// @title Borrower</span>
+<span id="L45"><span class="lineNum">      45</span>                 :             : /// @author Aloe Labs, Inc.</span>
+<span id="L46"><span class="lineNum">      46</span>                 :             : /// @dev &quot;Test everything; hold fast what is good.&quot; - 1 Thessalonians 5:21</span>
+<span id="L47"><span class="lineNum">      47</span>                 :             : contract Borrower is IUniswapV3MintCallback {</span>
+<span id="L48"><span class="lineNum">      48</span>                 :             :     using SafeTransferLib for ERC20;</span>
+<span id="L49"><span class="lineNum">      49</span>                 :             : </span>
+<span id="L50"><span class="lineNum">      50</span>                 :             :     /**</span>
+<span id="L51"><span class="lineNum">      51</span>                 :             :      * @notice Most liquidations involve swapping one asset for another. To incentivize such swaps (even in</span>
+<span id="L52"><span class="lineNum">      52</span>                 :             :      * volatile markets) liquidators are rewarded with a 5% bonus. To avoid paying that bonus to liquidators,</span>
+<span id="L53"><span class="lineNum">      53</span>                 :             :      * the account owner can listen for this event. Once it's emitted, they have 2 minutes to bring the</span>
+<span id="L54"><span class="lineNum">      54</span>                 :             :      * account back to health. If they fail, the liquidation will proceed.</span>
+<span id="L55"><span class="lineNum">      55</span>                 :             :      * @dev Fortuitous price movements and/or direct `Lender.repay` can bring the account back to health and</span>
+<span id="L56"><span class="lineNum">      56</span>                 :             :      * nullify the immediate liquidation threat, but they will not clear the warning. This means that next</span>
+<span id="L57"><span class="lineNum">      57</span>                 :             :      * time the account is unhealthy, liquidators might skip `warn` and `liquidate` right away. To clear the</span>
+<span id="L58"><span class="lineNum">      58</span>                 :             :      * warning and return to a &quot;clean&quot; state, make sure to call `modify` -- even if the callback is a no-op.</span>
+<span id="L59"><span class="lineNum">      59</span>                 :             :      * @dev The deadline for regaining health (avoiding liquidation) is given by `slot0.unleashLiquidationTime`.</span>
+<span id="L60"><span class="lineNum">      60</span>                 :             :      * If this value is 0, the account is in the aforementioned &quot;clean&quot; state.</span>
+<span id="L61"><span class="lineNum">      61</span>                 :             :      */</span>
+<span id="L62"><span class="lineNum">      62</span>                 :             :     event Warn();</span>
+<span id="L63"><span class="lineNum">      63</span>                 :             : </span>
+<span id="L64"><span class="lineNum">      64</span>                 :             :     /**</span>
+<span id="L65"><span class="lineNum">      65</span>                 :             :      * @notice Emitted when the account gets `liquidate`d</span>
+<span id="L66"><span class="lineNum">      66</span>                 :             :      * @param repay0 The amount of `TOKEN0` that was repaid</span>
+<span id="L67"><span class="lineNum">      67</span>                 :             :      * @param repay1 The amount of `TOKEN1` that was repaid</span>
+<span id="L68"><span class="lineNum">      68</span>                 :             :      * @param incentive1 The value of the swap bonus given to the liquidator, expressed in terms of `TOKEN1`</span>
+<span id="L69"><span class="lineNum">      69</span>                 :             :      * @param priceX128 The price at which the liquidation took place</span>
+<span id="L70"><span class="lineNum">      70</span>                 :             :      */</span>
+<span id="L71"><span class="lineNum">      71</span>                 :             :     event Liquidate(uint256 repay0, uint256 repay1, uint256 incentive1, uint256 priceX128);</span>
+<span id="L72"><span class="lineNum">      72</span>                 :             : </span>
+<span id="L73"><span class="lineNum">      73</span>                 :             :     enum State {</span>
+<span id="L74"><span class="lineNum">      74</span>                 :             :         Ready,</span>
+<span id="L75"><span class="lineNum">      75</span>                 :             :         Locked,</span>
+<span id="L76"><span class="lineNum">      76</span>                 :             :         InModifyCallback</span>
+<span id="L77"><span class="lineNum">      77</span>                 :             :     }</span>
+<span id="L78"><span class="lineNum">      78</span>                 :             : </span>
+<span id="L79"><span class="lineNum">      79</span>                 :             :     uint256 private constant SLOT0_MASK_POSITIONS = 0x000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffff;</span>
+<span id="L80"><span class="lineNum">      80</span>                 :             :     uint256 private constant SLOT0_MASK_UNLEASH   = 0x00ffffffffff0000000000000000000000000000000000000000000000000000; // prettier-ignore</span>
+<span id="L81"><span class="lineNum">      81</span>                 :             :     uint256 private constant SLOT0_MASK_STATE     = 0x7f00000000000000000000000000000000000000000000000000000000000000; // prettier-ignore</span>
+<span id="L82"><span class="lineNum">      82</span>                 :             :     uint256 private constant SLOT0_DIRT           = 0x8000000000000000000000000000000000000000000000000000000000000000; // prettier-ignore</span>
+<span id="L83"><span class="lineNum">      83</span>                 :             : </span>
+<span id="L84"><span class="lineNum">      84</span>                 :             :     /// @notice The factory that created this contract</span>
+<span id="L85"><span class="lineNum">      85</span>                 :             :     Factory public immutable FACTORY;</span>
+<span id="L86"><span class="lineNum">      86</span>                 :             : </span>
+<span id="L87"><span class="lineNum">      87</span>                 :             :     /// @notice The oracle to use for prices and implied volatility</span>
+<span id="L88"><span class="lineNum">      88</span>                 :             :     VolatilityOracle public immutable ORACLE;</span>
+<span id="L89"><span class="lineNum">      89</span>                 :             : </span>
+<span id="L90"><span class="lineNum">      90</span>                 :             :     /// @notice The Uniswap pair in which this `Borrower` can manage positions</span>
+<span id="L91"><span class="lineNum">      91</span>                 :             :     IUniswapV3Pool public immutable UNISWAP_POOL;</span>
+<span id="L92"><span class="lineNum">      92</span>                 :             : </span>
+<span id="L93"><span class="lineNum">      93</span>                 :             :     /// @notice The first token of the Uniswap pair</span>
+<span id="L94"><span class="lineNum">      94</span>                 :             :     ERC20 public immutable TOKEN0;</span>
+<span id="L95"><span class="lineNum">      95</span>                 :             : </span>
+<span id="L96"><span class="lineNum">      96</span>                 :             :     /// @notice The second token of the Uniswap pair</span>
+<span id="L97"><span class="lineNum">      97</span>                 :             :     ERC20 public immutable TOKEN1;</span>
+<span id="L98"><span class="lineNum">      98</span>                 :             : </span>
+<span id="L99"><span class="lineNum">      99</span>                 :             :     /// @notice The lender of `TOKEN0`</span>
+<span id="L100"><span class="lineNum">     100</span>                 :             :     Lender public immutable LENDER0;</span>
+<span id="L101"><span class="lineNum">     101</span>                 :             : </span>
+<span id="L102"><span class="lineNum">     102</span>                 :             :     /// @notice The lender of `TOKEN1`</span>
+<span id="L103"><span class="lineNum">     103</span>                 :             :     Lender public immutable LENDER1;</span>
+<span id="L104"><span class="lineNum">     104</span>                 :             : </span>
+<span id="L105"><span class="lineNum">     105</span>                 :             :     /**</span>
+<span id="L106"><span class="lineNum">     106</span>                 :             :      * @notice The `Borrower`'s only mutable storage. Lowest 144 bits store the lower/upper bounds of up to 3 Uniswap</span>
+<span id="L107"><span class="lineNum">     107</span>                 :             :      * positions, encoded by `Positions.zip`. Next 64 bits are unused within the `Borrower` and available to users as</span>
+<span id="L108"><span class="lineNum">     108</span>                 :             :      * &quot;free&quot; storage － no additional sstore's. These 208 bits (144 + 64) are passed to `IManager.callback`, and get</span>
+<span id="L109"><span class="lineNum">     109</span>                 :             :      * updated when the callback returns a non-zero value. The next 40 bits are either 0 or `unleashLiquidationTime`,</span>
+<span id="L110"><span class="lineNum">     110</span>                 :             :      * as explained in the `Warn` event docs. The highest 8 bits represent the current `State` enum, plus 128. We add</span>
+<span id="L111"><span class="lineNum">     111</span>                 :             :      * 128 (i.e. set the highest bit to 1) so that the slot is always non-zero, even in the absence of Uniswap</span>
+<span id="L112"><span class="lineNum">     112</span>                 :             :      * positions － this saves gas.</span>
+<span id="L113"><span class="lineNum">     113</span>                 :             :      */</span>
+<span id="L114"><span class="lineNum">     114</span>                 :             :     uint256 public slot0;</span>
+<span id="L115"><span class="lineNum">     115</span>                 :             : </span>
+<span id="L116"><span class="lineNum">     116</span>                 :             :     modifier onlyInModifyCallback() {</span>
+<span id="L117"><span class="lineNum">     117</span>                 :             :         require(slot0 &amp; SLOT0_MASK_STATE == uint256(State.InModifyCallback) &lt;&lt; 248);</span>
+<span id="L118"><span class="lineNum">     118</span>                 :             :         _;</span>
+<span id="L119"><span class="lineNum">     119</span>                 :             :     }</span>
+<span id="L120"><span class="lineNum">     120</span>                 :             : </span>
+<span id="L121"><span class="lineNum">     121</span>                 :             :     /*//////////////////////////////////////////////////////////////</span>
+<span id="L122"><span class="lineNum">     122</span>                 :             :                               CONSTRUCTOR</span>
+<span id="L123"><span class="lineNum">     123</span>                 :             :     //////////////////////////////////////////////////////////////*/</span>
+<span id="L124"><span class="lineNum">     124</span>                 :             : </span>
+<span id="L125"><span class="lineNum">     125</span>                 :             :     constructor(VolatilityOracle oracle, IUniswapV3Pool pool, Lender lender0, Lender lender1) {</span>
+<span id="L126"><span class="lineNum">     126</span>                 :             :         FACTORY = Factory(msg.sender);</span>
+<span id="L127"><span class="lineNum">     127</span>                 :             :         ORACLE = oracle;</span>
+<span id="L128"><span class="lineNum">     128</span>                 :             :         UNISWAP_POOL = pool;</span>
+<span id="L129"><span class="lineNum">     129</span>                 :             :         LENDER0 = lender0;</span>
+<span id="L130"><span class="lineNum">     130</span>                 :             :         LENDER1 = lender1;</span>
+<span id="L131"><span class="lineNum">     131</span>                 :             : </span>
+<span id="L132"><span class="lineNum">     132</span>                 :             :         TOKEN0 = lender0.asset();</span>
+<span id="L133"><span class="lineNum">     133</span>                 :             :         TOKEN1 = lender1.asset();</span>
+<span id="L134"><span class="lineNum">     134</span>                 :             : </span>
+<span id="L135"><span class="lineNum">     135</span>                 :             :         assert(pool.token0() == address(TOKEN0) &amp;&amp; pool.token1() == address(TOKEN1));</span>
+<span id="L136"><span class="lineNum">     136</span>                 :             :     }</span>
+<span id="L137"><span class="lineNum">     137</span>                 :             : </span>
+<span id="L138"><span class="lineNum">     138</span>                 :             :     receive() external payable {}</span>
+<span id="L139"><span class="lineNum">     139</span>                 :             : </span>
+<span id="L140"><span class="lineNum">     140</span>                 :<span class="tlaGNC tlaBgGNC">           1 :     function owner() public pure returns (address) {</span></span>
+<span id="L141"><span class="lineNum">     141</span>                 :<span class="tlaGNC">       28708 :         return ImmutableArgs.addr();</span></span>
+<span id="L142"><span class="lineNum">     142</span>                 :             :     }</span>
+<span id="L143"><span class="lineNum">     143</span>                 :             : </span>
+<span id="L144"><span class="lineNum">     144</span>                 :             :     /*//////////////////////////////////////////////////////////////</span>
+<span id="L145"><span class="lineNum">     145</span>                 :             :                            MAIN ENTRY POINTS</span>
+<span id="L146"><span class="lineNum">     146</span>                 :             :     //////////////////////////////////////////////////////////////*/</span>
+<span id="L147"><span class="lineNum">     147</span>                 :             : </span>
+<span id="L148"><span class="lineNum">     148</span>                 :             :     /**</span>
+<span id="L149"><span class="lineNum">     149</span>                 :             :      * @notice Warns the borrower that they're about to be liquidated. NOTE: Liquidators are only</span>
+<span id="L150"><span class="lineNum">     150</span>                 :             :      * forced to call this in cases where the 5% swap bonus is up for grabs.</span>
+<span id="L151"><span class="lineNum">     151</span>                 :             :      * @param oracleSeed The indices of `UNISWAP_POOL.observations` where we start our search for</span>
+<span id="L152"><span class="lineNum">     152</span>                 :             :      * the 30-minute-old (lowest 16 bits) and 60-minute-old (next 16 bits) observations when getting</span>
+<span id="L153"><span class="lineNum">     153</span>                 :             :      * TWAPs. If any of the highest 8 bits are set, we fallback to onchain binary search.</span>
+<span id="L154"><span class="lineNum">     154</span>                 :             :      */</span>
+<span id="L155"><span class="lineNum">     155</span>                 :<span class="tlaGNC">       12291 :     function warn(uint40 oracleSeed) external {</span></span>
+<span id="L156"><span class="lineNum">     156</span>                 :<span class="tlaGNC">       12291 :         uint256 slot0_ = slot0;</span></span>
+<span id="L157"><span class="lineNum">     157</span>                 :             :         // Essentially `slot0.state == State.Ready &amp;&amp; slot0.unleashLiquidationTime == 0`</span>
+<span id="L158"><span class="lineNum">     158</span>         [<span class="tlaGBC" title="Branch 0 was taken 4096 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 8195 times"> + </span>]:<span class="tlaGNC">       12291 :         require(slot0_ &amp; (SLOT0_MASK_STATE | SLOT0_MASK_UNLEASH) == 0);</span></span>
+<span id="L159"><span class="lineNum">     159</span>                 :             : </span>
+<span id="L160"><span class="lineNum">     160</span>                 :             :         {</span>
+<span id="L161"><span class="lineNum">     161</span>                 :             :             // Fetch prices from oracle</span>
+<span id="L162"><span class="lineNum">     162</span>                 :<span class="tlaGNC">        8195 :             (Prices memory prices, ) = getPrices(oracleSeed);</span></span>
+<span id="L163"><span class="lineNum">     163</span>                 :             :             // Tally assets without actually withdrawing Uniswap positions</span>
+<span id="L164"><span class="lineNum">     164</span>                 :<span class="tlaGNC">        8195 :             Assets memory assets = _getAssets(slot0_, prices, false);</span></span>
+<span id="L165"><span class="lineNum">     165</span>                 :             :             // Fetch liabilities from lenders</span>
+<span id="L166"><span class="lineNum">     166</span>                 :<span class="tlaGNC">        8195 :             (uint256 liabilities0, uint256 liabilities1) = _getLiabilities();</span></span>
+<span id="L167"><span class="lineNum">     167</span>                 :             :             // Ensure only unhealthy accounts get warned</span>
+<span id="L168"><span class="lineNum">     168</span>         [<span class="tlaGBC" title="Branch 0 was taken 4096 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 4099 times"> + </span>]:<span class="tlaGNC">        8195 :             require(!BalanceSheet.isHealthy(prices, assets, liabilities0, liabilities1), &quot;Aloe: healthy&quot;);</span></span>
+<span id="L169"><span class="lineNum">     169</span>                 :             :         }</span>
+<span id="L170"><span class="lineNum">     170</span>                 :             : </span>
+<span id="L171"><span class="lineNum">     171</span>                 :<span class="tlaGNC">        4099 :         slot0 = slot0_ | ((block.timestamp + LIQUIDATION_GRACE_PERIOD) &lt;&lt; 208);</span></span>
+<span id="L172"><span class="lineNum">     172</span>                 :<span class="tlaGNC">        4099 :         emit Warn();</span></span>
+<span id="L173"><span class="lineNum">     173</span>                 :             :     }</span>
+<span id="L174"><span class="lineNum">     174</span>                 :             : </span>
+<span id="L175"><span class="lineNum">     175</span>                 :             :     /**</span>
+<span id="L176"><span class="lineNum">     176</span>                 :             :      * @notice Liquidates the borrower, using all available assets to pay down liabilities. If</span>
+<span id="L177"><span class="lineNum">     177</span>                 :             :      * some or all of the payment cannot be made in-kind, `callee` is expected to swap one asset</span>
+<span id="L178"><span class="lineNum">     178</span>                 :             :      * for the other at a venue of their choosing. NOTE: Branches involving callbacks will fail</span>
+<span id="L179"><span class="lineNum">     179</span>                 :             :      * until the borrower has been `warn`ed and the grace period has expired.</span>
+<span id="L180"><span class="lineNum">     180</span>                 :             :      * @dev As a baseline, `callee` receives `address(this).balance / strain` ETH. This amount is</span>
+<span id="L181"><span class="lineNum">     181</span>                 :             :      * intended to cover transaction fees. If the liquidation involves a swap callback, `callee`</span>
+<span id="L182"><span class="lineNum">     182</span>                 :             :      * receives a 5% bonus denominated in the surplus token. In other words, if the two numeric</span>
+<span id="L183"><span class="lineNum">     183</span>                 :             :      * callback arguments were denominated in the same asset, the first argument would be 5% larger.</span>
+<span id="L184"><span class="lineNum">     184</span>                 :             :      * @param callee A smart contract capable of swapping `TOKEN0` for `TOKEN1` and vice versa</span>
+<span id="L185"><span class="lineNum">     185</span>                 :             :      * @param data Encoded parameters that get forwarded to `callee` callbacks</span>
+<span id="L186"><span class="lineNum">     186</span>                 :             :      * @param strain Almost always set to `1` to pay off all debt and receive maximum reward. If</span>
+<span id="L187"><span class="lineNum">     187</span>                 :             :      * liquidity is thin and swap price impact would be too large, you can use higher values to</span>
+<span id="L188"><span class="lineNum">     188</span>                 :             :      * reduce swap size and make it easier for `callee` to do its job. `2` would be half swap size,</span>
+<span id="L189"><span class="lineNum">     189</span>                 :             :      * `3` one third, and so on.</span>
+<span id="L190"><span class="lineNum">     190</span>                 :             :      * @param oracleSeed The indices of `UNISWAP_POOL.observations` where we start our search for</span>
+<span id="L191"><span class="lineNum">     191</span>                 :             :      * the 30-minute-old (lowest 16 bits) and 60-minute-old (next 16 bits) observations when getting</span>
+<span id="L192"><span class="lineNum">     192</span>                 :             :      * TWAPs. If any of the highest 8 bits are set, we fallback to onchain binary search.</span>
+<span id="L193"><span class="lineNum">     193</span>                 :             :      */</span>
+<span id="L194"><span class="lineNum">     194</span>                 :<span class="tlaGNC">       45081 :     function liquidate(ILiquidator callee, bytes calldata data, uint256 strain, uint40 oracleSeed) external {</span></span>
+<span id="L195"><span class="lineNum">     195</span>                 :<span class="tlaGNC">       45081 :         uint256 slot0_ = slot0;</span></span>
+<span id="L196"><span class="lineNum">     196</span>                 :             :         // Essentially `slot0.state == State.Ready`</span>
+<span id="L197"><span class="lineNum">     197</span>         [<span class="tlaGBC" title="Branch 0 was taken 4096 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 40985 times"> + </span>]:<span class="tlaGNC">       45081 :         require(slot0_ &amp; SLOT0_MASK_STATE == 0);</span></span>
+<span id="L198"><span class="lineNum">     198</span>                 :<span class="tlaGNC">       40985 :         slot0 = slot0_ | (uint256(State.Locked) &lt;&lt; 248);</span></span>
+<span id="L199"><span class="lineNum">     199</span>                 :             : </span>
+<span id="L200"><span class="lineNum">     200</span>                 :<span class="tlaGNC">       40985 :         uint256 priceX128;</span></span>
+<span id="L201"><span class="lineNum">     201</span>                 :<span class="tlaGNC">       40985 :         uint256 liabilities0;</span></span>
+<span id="L202"><span class="lineNum">     202</span>                 :<span class="tlaGNC">       40985 :         uint256 liabilities1;</span></span>
+<span id="L203"><span class="lineNum">     203</span>                 :<span class="tlaGNC">       40985 :         uint256 incentive1;</span></span>
+<span id="L204"><span class="lineNum">     204</span>                 :             :         {</span>
+<span id="L205"><span class="lineNum">     205</span>                 :             :             // Fetch prices from oracle</span>
+<span id="L206"><span class="lineNum">     206</span>                 :<span class="tlaGNC">       40985 :             (Prices memory prices, ) = getPrices(oracleSeed);</span></span>
+<span id="L207"><span class="lineNum">     207</span>                 :<span class="tlaGNC">       40985 :             priceX128 = square(prices.c);</span></span>
+<span id="L208"><span class="lineNum">     208</span>                 :             :             // Withdraw Uniswap positions while tallying assets</span>
+<span id="L209"><span class="lineNum">     209</span>                 :<span class="tlaGNC">       40985 :             Assets memory assets = _getAssets(slot0_, prices, true);</span></span>
+<span id="L210"><span class="lineNum">     210</span>                 :             :             // Fetch liabilities from lenders</span>
+<span id="L211"><span class="lineNum">     211</span>                 :<span class="tlaGNC">       40985 :             (liabilities0, liabilities1) = _getLiabilities();</span></span>
+<span id="L212"><span class="lineNum">     212</span>                 :             :             // Calculate liquidation incentive</span>
+<span id="L213"><span class="lineNum">     213</span>                 :<span class="tlaGNC">       40985 :             incentive1 = BalanceSheet.computeLiquidationIncentive(</span></span>
+<span id="L214"><span class="lineNum">     214</span>                 :             :                 assets.fixed0 + assets.fluid0C, // total assets0 at `prices.c` (the TWAP)</span>
+<span id="L215"><span class="lineNum">     215</span>                 :             :                 assets.fixed1 + assets.fluid1C, // total assets1 at `prices.c` (the TWAP)</span>
+<span id="L216"><span class="lineNum">     216</span>                 :             :                 liabilities0,</span>
+<span id="L217"><span class="lineNum">     217</span>                 :             :                 liabilities1,</span>
+<span id="L218"><span class="lineNum">     218</span>                 :             :                 priceX128</span>
+<span id="L219"><span class="lineNum">     219</span>                 :             :             );</span>
+<span id="L220"><span class="lineNum">     220</span>                 :             :             // Ensure only unhealthy accounts can be liquidated</span>
+<span id="L221"><span class="lineNum">     221</span>         [<span class="tlaGBC" title="Branch 0 was taken 12296 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 28689 times"> + </span>]:<span class="tlaGNC">       40985 :             require(!BalanceSheet.isHealthy(prices, assets, liabilities0, liabilities1), &quot;Aloe: healthy&quot;);</span></span>
+<span id="L222"><span class="lineNum">     222</span>                 :             :         }</span>
+<span id="L223"><span class="lineNum">     223</span>                 :             : </span>
+<span id="L224"><span class="lineNum">     224</span>                 :             :         // NOTE: The health check values assets at the TWAP and is difficult to manipulate. However,</span>
+<span id="L225"><span class="lineNum">     225</span>                 :             :         // the instantaneous price does impact what tokens we receive when burning Uniswap positions.</span>
+<span id="L226"><span class="lineNum">     226</span>                 :             :         // As such, additional calls to `TOKEN0.balanceOf` and `TOKEN1.balanceOf` are required for</span>
+<span id="L227"><span class="lineNum">     227</span>                 :             :         // precise inventory, and we take care not to increase `incentive1`.</span>
+<span id="L228"><span class="lineNum">     228</span>                 :             : </span>
+<span id="L229"><span class="lineNum">     229</span>                 :             :         unchecked {</span>
+<span id="L230"><span class="lineNum">     230</span>                 :             :             // Figure out what portion of liabilities can be repaid using existing assets</span>
+<span id="L231"><span class="lineNum">     231</span>                 :<span class="tlaGNC">       28689 :             uint256 repayable0 = Math.min(liabilities0, TOKEN0.balanceOf(address(this)));</span></span>
+<span id="L232"><span class="lineNum">     232</span>                 :<span class="tlaGNC">       28689 :             uint256 repayable1 = Math.min(liabilities1, TOKEN1.balanceOf(address(this)));</span></span>
+<span id="L233"><span class="lineNum">     233</span>                 :             : </span>
+<span id="L234"><span class="lineNum">     234</span>                 :             :             // See what remains (similar to &quot;shortfall&quot; in BalanceSheet)</span>
+<span id="L235"><span class="lineNum">     235</span>                 :<span class="tlaGNC">       28689 :             liabilities0 -= repayable0;</span></span>
+<span id="L236"><span class="lineNum">     236</span>                 :<span class="tlaGNC">       28689 :             liabilities1 -= repayable1;</span></span>
+<span id="L237"><span class="lineNum">     237</span>                 :             : </span>
+<span id="L238"><span class="lineNum">     238</span>                 :             :             // Decide whether to swap or not</span>
+<span id="L239"><span class="lineNum">     239</span>                 :<span class="tlaGNC">       28689 :             bool shouldSwap;</span></span>
+<span id="L240"><span class="lineNum">     240</span>                 :             :             assembly (&quot;memory-safe&quot;) {</span>
+<span id="L241"><span class="lineNum">     241</span>                 :             :                 // If both are zero or neither is zero, there's nothing more to do</span>
+<span id="L242"><span class="lineNum">     242</span>                 :<span class="tlaGNC">       28689 :                 shouldSwap := xor(gt(liabilities0, 0), gt(liabilities1, 0))</span></span>
+<span id="L243"><span class="lineNum">     243</span>                 :             :                 // Divide by `strain` and check again. This second check can generate false positives in cases</span>
+<span id="L244"><span class="lineNum">     244</span>                 :             :                 // where one division (not both) floors to 0, which is why we `and()` with the check above.</span>
+<span id="L245"><span class="lineNum">     245</span>                 :<span class="tlaGNC">       28689 :                 liabilities0 := div(liabilities0, strain)</span></span>
+<span id="L246"><span class="lineNum">     246</span>                 :<span class="tlaGNC">       28689 :                 liabilities1 := div(liabilities1, strain)</span></span>
+<span id="L247"><span class="lineNum">     247</span>                 :<span class="tlaGNC">       28689 :                 shouldSwap := and(shouldSwap, xor(gt(liabilities0, 0), gt(liabilities1, 0)))</span></span>
+<span id="L248"><span class="lineNum">     248</span>                 :             :                 // If not swapping, set `incentive1 = 0`</span>
+<span id="L249"><span class="lineNum">     249</span>                 :<span class="tlaGNC">       28689 :                 incentive1 := mul(shouldSwap, incentive1)</span></span>
+<span id="L250"><span class="lineNum">     250</span>                 :             :             }</span>
+<span id="L251"><span class="lineNum">     251</span>                 :             : </span>
+<span id="L252"><span class="lineNum">     252</span>         [<span class="tlaUNC" title="Branch 0 was not executed"> # </span><span class="tlaGBC" title="Branch 1 was taken 4096 times"> + </span>]:<span class="tlaGNC">       28689 :             if (shouldSwap) {</span></span>
+<span id="L253"><span class="lineNum">     253</span>                 :<span class="tlaGNC">       16390 :                 uint256 unleashTime = (slot0_ &amp; SLOT0_MASK_UNLEASH) &gt;&gt; 208;</span></span>
+<span id="L254"><span class="lineNum">     254</span>         [<span class="tlaGBC" title="Branch 0 was taken 3 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 16387 times"> + </span>]:<span class="tlaGNC">       16390 :                 require(0 &lt; unleashTime &amp;&amp; unleashTime &lt; block.timestamp, &quot;Aloe: grace&quot;);</span></span>
+<span id="L255"><span class="lineNum">     255</span>                 :             : </span>
+<span id="L256"><span class="lineNum">     256</span>                 :<span class="tlaGNC">       16387 :                 incentive1 /= strain;</span></span>
+<span id="L257"><span class="lineNum">     257</span>         [<span class="tlaGBC" title="Branch 0 was taken 4096 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 8195 times"> + </span>]:<span class="tlaGNC">       16387 :                 if (liabilities0 &gt; 0) {</span></span>
+<span id="L258"><span class="lineNum">     258</span>                 :             :                     // NOTE: This value is not constrained to `TOKEN1.balanceOf(address(this))`, so liquidators</span>
+<span id="L259"><span class="lineNum">     259</span>                 :             :                     // are responsible for setting `strain` such that the transfer doesn't revert. This shouldn't</span>
+<span id="L260"><span class="lineNum">     260</span>                 :             :                     // be an issue unless the borrower has already started accruing bad debt.</span>
+<span id="L261"><span class="lineNum">     261</span>                 :<span class="tlaGNC">       12291 :                     uint256 available1 = mulDiv128(liabilities0, priceX128) + incentive1;</span></span>
+<span id="L262"><span class="lineNum">     262</span>                 :             : </span>
+<span id="L263"><span class="lineNum">     263</span>                 :<span class="tlaGNC">       12291 :                     TOKEN1.safeTransfer(address(callee), available1);</span></span>
+<span id="L264"><span class="lineNum">     264</span>                 :<span class="tlaGNC">       12291 :                     callee.swap1For0(data, available1, liabilities0);</span></span>
+<span id="L265"><span class="lineNum">     265</span>                 :             : </span>
+<span id="L266"><span class="lineNum">     266</span>                 :<span class="tlaGNC">        8195 :                     repayable0 += liabilities0;</span></span>
+<span id="L267"><span class="lineNum">     267</span>                 :             :                 } else {</span>
+<span id="L268"><span class="lineNum">     268</span>                 :             :                     // NOTE: This value is not constrained to `TOKEN0.balanceOf(address(this))`, so liquidators</span>
+<span id="L269"><span class="lineNum">     269</span>                 :             :                     // are responsible for setting `strain` such that the transfer doesn't revert. This shouldn't</span>
+<span id="L270"><span class="lineNum">     270</span>                 :             :                     // be an issue unless the borrower has already started accruing bad debt.</span>
+<span id="L271"><span class="lineNum">     271</span>                 :<span class="tlaGNC">        4096 :                     uint256 available0 = Math.mulDiv(liabilities1 + incentive1, Q128, priceX128);</span></span>
+<span id="L272"><span class="lineNum">     272</span>                 :             : </span>
+<span id="L273"><span class="lineNum">     273</span>                 :<span class="tlaGNC">        4096 :                     TOKEN0.safeTransfer(address(callee), available0);</span></span>
+<span id="L274"><span class="lineNum">     274</span>                 :<span class="tlaGNC">        4096 :                     callee.swap0For1(data, available0, liabilities1);</span></span>
+<span id="L275"><span class="lineNum">     275</span>                 :             : </span>
+<span id="L276"><span class="lineNum">     276</span>                 :<span class="tlaGNC">        4096 :                     repayable1 += liabilities1;</span></span>
+<span id="L277"><span class="lineNum">     277</span>                 :             :                 }</span>
+<span id="L278"><span class="lineNum">     278</span>                 :             :             }</span>
+<span id="L279"><span class="lineNum">     279</span>                 :             : </span>
+<span id="L280"><span class="lineNum">     280</span>                 :<span class="tlaGNC">       24590 :             _repay(repayable0, repayable1);</span></span>
+<span id="L281"><span class="lineNum">     281</span>                 :<span class="tlaGNC">       24590 :             slot0 = (slot0_ &amp; SLOT0_MASK_POSITIONS) | SLOT0_DIRT;</span></span>
+<span id="L282"><span class="lineNum">     282</span>                 :             : </span>
+<span id="L283"><span class="lineNum">     283</span>                 :<span class="tlaGNC">       24590 :             payable(callee).transfer(address(this).balance / strain);</span></span>
+<span id="L284"><span class="lineNum">     284</span>                 :<span class="tlaGNC">       16394 :             emit Liquidate(repayable0, repayable1, incentive1, priceX128);</span></span>
+<span id="L285"><span class="lineNum">     285</span>                 :             :         }</span>
+<span id="L286"><span class="lineNum">     286</span>                 :             :     }</span>
+<span id="L287"><span class="lineNum">     287</span>                 :             : </span>
+<span id="L288"><span class="lineNum">     288</span>                 :             :     /**</span>
+<span id="L289"><span class="lineNum">     289</span>                 :             :      * @notice Allows the owner to manage their account by handing control to some `callee`. Inside the</span>
+<span id="L290"><span class="lineNum">     290</span>                 :             :      * callback `callee` has access to all sub-commands (`uniswapDeposit`, `uniswapWithdraw`, `transfer`,</span>
+<span id="L291"><span class="lineNum">     291</span>                 :             :      * `borrow`, `repay`, and `withdrawAnte`). Whatever `callee` does, the account MUST be healthy</span>
+<span id="L292"><span class="lineNum">     292</span>                 :             :      * after the callback.</span>
+<span id="L293"><span class="lineNum">     293</span>                 :             :      * @param callee The smart contract that will get temporary control of this account</span>
+<span id="L294"><span class="lineNum">     294</span>                 :             :      * @param data Encoded parameters that get forwarded to `callee`</span>
+<span id="L295"><span class="lineNum">     295</span>                 :             :      * @param oracleSeed The indices of `UNISWAP_POOL.observations` where we start our search for</span>
+<span id="L296"><span class="lineNum">     296</span>                 :             :      * the 30-minute-old (lowest 16 bits) and 60-minute-old (next 16 bits) observations when getting</span>
+<span id="L297"><span class="lineNum">     297</span>                 :             :      * TWAPs. If any of the highest 8 bits are set, we fallback to onchain binary search.</span>
+<span id="L298"><span class="lineNum">     298</span>                 :             :      */</span>
+<span id="L299"><span class="lineNum">     299</span>                 :<span class="tlaGNC">       28707 :     function modify(IManager callee, bytes calldata data, uint40 oracleSeed) external payable {</span></span>
+<span id="L300"><span class="lineNum">     300</span>                 :<span class="tlaGNC">       28707 :         uint256 slot0_ = slot0;</span></span>
+<span id="L301"><span class="lineNum">     301</span>                 :             :         // Essentially `slot0.state == State.Ready &amp;&amp; msg.sender == owner()`</span>
+<span id="L302"><span class="lineNum">     302</span>         [<span class="tlaUNC" title="Branch 0 was not executed"> # </span><span class="tlaGBC" title="Branch 1 was taken 28707 times"> + </span>]:<span class="tlaGNC">       28707 :         require(slot0_ &amp; SLOT0_MASK_STATE == 0 &amp;&amp; msg.sender == owner(), &quot;Aloe: only owner&quot;);</span></span>
+<span id="L303"><span class="lineNum">     303</span>                 :             : </span>
+<span id="L304"><span class="lineNum">     304</span>                 :<span class="tlaGNC">       28707 :         slot0 = slot0_ | (uint256(State.InModifyCallback) &lt;&lt; 248);</span></span>
+<span id="L305"><span class="lineNum">     305</span>                 :             :         {</span>
+<span id="L306"><span class="lineNum">     306</span>                 :<span class="tlaGNC">       28707 :             uint208 positions = callee.callback(data, msg.sender, uint208(slot0_));</span></span>
+<span id="L307"><span class="lineNum">     307</span>                 :             :             assembly (&quot;memory-safe&quot;) {</span>
+<span id="L308"><span class="lineNum">     308</span>                 :             :                 // Equivalent to `if (positions &gt; 0) slot0_ = positions`</span>
+<span id="L309"><span class="lineNum">     309</span>                 :<span class="tlaGNC">       28707 :                 slot0_ := or(positions, mul(slot0_, iszero(positions)))</span></span>
+<span id="L310"><span class="lineNum">     310</span>                 :             :             }</span>
+<span id="L311"><span class="lineNum">     311</span>                 :             :         }</span>
+<span id="L312"><span class="lineNum">     312</span>                 :<span class="tlaGNC">       28707 :         slot0 = (slot0_ &amp; SLOT0_MASK_POSITIONS) | SLOT0_DIRT;</span></span>
+<span id="L313"><span class="lineNum">     313</span>                 :             : </span>
+<span id="L314"><span class="lineNum">     314</span>                 :<span class="tlaGNC">       28707 :         (uint256 liabilities0, uint256 liabilities1) = _getLiabilities();</span></span>
+<span id="L315"><span class="lineNum">     315</span>         [<span class="tlaUNC" title="Branch 0 was not executed"> # </span><span class="tlaGBC" title="Branch 1 was taken 28706 times"> + </span>]:<span class="tlaGNC">       28707 :         if (liabilities0 &gt; 0 || liabilities1 &gt; 0) {</span></span>
+<span id="L316"><span class="lineNum">     316</span>                 :<span class="tlaGNC">       28706 :             (uint208 ante, uint8 nSigma, uint8 mtd, uint32 pausedUntilTime) = FACTORY.getParameters(UNISWAP_POOL);</span></span>
+<span id="L317"><span class="lineNum">     317</span>                 :<span class="tlaGNC">       28706 :             (Prices memory prices, bool seemsLegit) = _getPrices(oracleSeed, nSigma, mtd);</span></span>
+<span id="L318"><span class="lineNum">     318</span>                 :             : </span>
+<span id="L319"><span class="lineNum">     319</span>         [<span class="tlaUNC" title="Branch 0 was not executed"> # </span><span class="tlaGBC" title="Branch 1 was taken 28706 times"> + </span>]:<span class="tlaGNC">       28706 :             require(</span></span>
+<span id="L320"><span class="lineNum">     320</span>                 :             :                 seemsLegit &amp;&amp; (block.timestamp &gt; pausedUntilTime) &amp;&amp; (address(this).balance &gt;= ante),</span>
+<span id="L321"><span class="lineNum">     321</span>                 :             :                 &quot;Aloe: missing ante / sus price&quot;</span>
+<span id="L322"><span class="lineNum">     322</span>                 :             :             );</span>
+<span id="L323"><span class="lineNum">     323</span>                 :             : </span>
+<span id="L324"><span class="lineNum">     324</span>                 :<span class="tlaGNC">       28706 :             Assets memory assets = _getAssets(slot0_, prices, false);</span></span>
+<span id="L325"><span class="lineNum">     325</span>         [<span class="tlaUNC" title="Branch 0 was not executed"> # </span><span class="tlaGBC" title="Branch 1 was taken 28706 times"> + </span>]:<span class="tlaGNC">       28706 :             require(BalanceSheet.isHealthy(prices, assets, liabilities0, liabilities1), &quot;Aloe: unhealthy&quot;);</span></span>
+<span id="L326"><span class="lineNum">     326</span>                 :             :         }</span>
+<span id="L327"><span class="lineNum">     327</span>                 :             :     }</span>
+<span id="L328"><span class="lineNum">     328</span>                 :             : </span>
+<span id="L329"><span class="lineNum">     329</span>                 :             :     /*//////////////////////////////////////////////////////////////</span>
+<span id="L330"><span class="lineNum">     330</span>                 :             :                               SUB-COMMANDS</span>
+<span id="L331"><span class="lineNum">     331</span>                 :             :     //////////////////////////////////////////////////////////////*/</span>
+<span id="L332"><span class="lineNum">     332</span>                 :             : </span>
+<span id="L333"><span class="lineNum">     333</span>                 :             :     /**</span>
+<span id="L334"><span class="lineNum">     334</span>                 :             :      * @notice Callback for Uniswap V3 pool; necessary for `uniswapDeposit` to work</span>
+<span id="L335"><span class="lineNum">     335</span>                 :             :      * @param amount0 The amount of `TOKEN0` owed to the `UNISWAP_POOL`</span>
+<span id="L336"><span class="lineNum">     336</span>                 :             :      * @param amount1 The amount of `TOKEN1` owed to the `UNISWAP_POOL`</span>
+<span id="L337"><span class="lineNum">     337</span>                 :             :      */</span>
+<span id="L338"><span class="lineNum">     338</span>                 :<span class="tlaGNC">           4 :     function uniswapV3MintCallback(uint256 amount0, uint256 amount1, bytes calldata) external {</span></span>
+<span id="L339"><span class="lineNum">     339</span>         [<span class="tlaUNC" title="Branch 0 was not executed"> # </span><span class="tlaGBC" title="Branch 1 was taken 4 times"> + </span>]:<span class="tlaGNC">           4 :         require(msg.sender == address(UNISWAP_POOL));</span></span>
+<span id="L340"><span class="lineNum">     340</span>                 :             : </span>
+<span id="L341"><span class="lineNum">     341</span>         [<span class="tlaGBC" title="Branch 0 was taken 4 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 4 times"> + </span>]:<span class="tlaGNC">           4 :         if (amount0 &gt; 0) TOKEN0.safeTransfer(msg.sender, amount0);</span></span>
+<span id="L342"><span class="lineNum">     342</span>         [<span class="tlaGBC" title="Branch 0 was taken 4 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 4 times"> + </span>]:<span class="tlaGNC">           4 :         if (amount1 &gt; 0) TOKEN1.safeTransfer(msg.sender, amount1);</span></span>
+<span id="L343"><span class="lineNum">     343</span>                 :             :     }</span>
+<span id="L344"><span class="lineNum">     344</span>                 :             : </span>
+<span id="L345"><span class="lineNum">     345</span>                 :             :     /**</span>
+<span id="L346"><span class="lineNum">     346</span>                 :             :      * @notice Allows the `owner()` to add liquidity to a Uniswap position (or create a new one). Only works</span>
+<span id="L347"><span class="lineNum">     347</span>                 :             :      * within the `modify` callback.</span>
+<span id="L348"><span class="lineNum">     348</span>                 :             :      * @dev The `LiquidityAmounts` library can help convert underlying amounts to units of `liquidity`.</span>
+<span id="L349"><span class="lineNum">     349</span>                 :             :      * NOTE: Depending on your use-case, it may be more gas-efficient to call `UNISWAP_POOL.mint` in your</span>
+<span id="L350"><span class="lineNum">     350</span>                 :             :      * own contract, instead of doing `uniswapDeposit` inside of `modify`'s callback. As long as you set</span>
+<span id="L351"><span class="lineNum">     351</span>                 :             :      * this `Borrower` as the recipient in `UNISWAP_POOL.mint`, the result is the same.</span>
+<span id="L352"><span class="lineNum">     352</span>                 :             :      * @param lower The tick at the position's lower bound</span>
+<span id="L353"><span class="lineNum">     353</span>                 :             :      * @param upper The tick at the position's upper bound</span>
+<span id="L354"><span class="lineNum">     354</span>                 :             :      * @param liquidity The amount of liquidity to add, in Uniswap's internal units</span>
+<span id="L355"><span class="lineNum">     355</span>                 :             :      * @return amount0 The precise amount of `TOKEN0` that went into the Uniswap position</span>
+<span id="L356"><span class="lineNum">     356</span>                 :             :      * @return amount1 The precise amount of `TOKEN1` that went into the Uniswap position</span>
+<span id="L357"><span class="lineNum">     357</span>                 :             :      */</span>
+<span id="L358"><span class="lineNum">     358</span>                 :<span class="tlaGNC">           4 :     function uniswapDeposit(</span></span>
+<span id="L359"><span class="lineNum">     359</span>                 :             :         int24 lower,</span>
+<span id="L360"><span class="lineNum">     360</span>                 :             :         int24 upper,</span>
+<span id="L361"><span class="lineNum">     361</span>                 :             :         uint128 liquidity</span>
+<span id="L362"><span class="lineNum">     362</span>                 :             :     ) external onlyInModifyCallback returns (uint256 amount0, uint256 amount1) {</span>
+<span id="L363"><span class="lineNum">     363</span>                 :<span class="tlaGNC">           4 :         (amount0, amount1) = UNISWAP_POOL.mint(address(this), lower, upper, liquidity, &quot;&quot;);</span></span>
+<span id="L364"><span class="lineNum">     364</span>                 :             :     }</span>
+<span id="L365"><span class="lineNum">     365</span>                 :             : </span>
+<span id="L366"><span class="lineNum">     366</span>                 :             :     /**</span>
+<span id="L367"><span class="lineNum">     367</span>                 :             :      * @notice Allows the `owner()` to withdraw liquidity from one of their Uniswap positions. Only works within</span>
+<span id="L368"><span class="lineNum">     368</span>                 :             :      * the `modify` callback.</span>
+<span id="L369"><span class="lineNum">     369</span>                 :             :      * @dev The `LiquidityAmounts` library can help convert underlying amounts to units of `liquidity`</span>
+<span id="L370"><span class="lineNum">     370</span>                 :             :      * @param lower The tick at the position's lower bound</span>
+<span id="L371"><span class="lineNum">     371</span>                 :             :      * @param upper The tick at the position's upper bound</span>
+<span id="L372"><span class="lineNum">     372</span>                 :             :      * @param liquidity The amount of liquidity to remove, in Uniswap's internal units. Pass 0 to collect</span>
+<span id="L373"><span class="lineNum">     373</span>                 :             :      * fees without burning any liquidity.</span>
+<span id="L374"><span class="lineNum">     374</span>                 :             :      * @param recipient Receives the tokens from Uniswap. Usually the address of this `Borrower` account.</span>
+<span id="L375"><span class="lineNum">     375</span>                 :             :      * @return burned0 The amount of `TOKEN0` that was removed from the Uniswap position</span>
+<span id="L376"><span class="lineNum">     376</span>                 :             :      * @return burned1 The amount of `TOKEN1` that was removed from the Uniswap position</span>
+<span id="L377"><span class="lineNum">     377</span>                 :             :      * @return collected0 Equal to `burned0` plus any earned `TOKEN0` fees that hadn't yet been claimed</span>
+<span id="L378"><span class="lineNum">     378</span>                 :             :      * @return collected1 Equal to `burned1` plus any earned `TOKEN1` fees that hadn't yet been claimed</span>
+<span id="L379"><span class="lineNum">     379</span>                 :             :      */</span>
+<span id="L380"><span class="lineNum">     380</span>                 :<span class="tlaGNC">           1 :     function uniswapWithdraw(</span></span>
+<span id="L381"><span class="lineNum">     381</span>                 :             :         int24 lower,</span>
+<span id="L382"><span class="lineNum">     382</span>                 :             :         int24 upper,</span>
+<span id="L383"><span class="lineNum">     383</span>                 :             :         uint128 liquidity,</span>
+<span id="L384"><span class="lineNum">     384</span>                 :             :         address recipient</span>
+<span id="L385"><span class="lineNum">     385</span>                 :             :     ) external onlyInModifyCallback returns (uint256 burned0, uint256 burned1, uint256 collected0, uint256 collected1) {</span>
+<span id="L386"><span class="lineNum">     386</span>                 :<span class="tlaGNC">           1 :         (burned0, burned1, collected0, collected1) = _uniswapWithdraw(lower, upper, liquidity, recipient);</span></span>
+<span id="L387"><span class="lineNum">     387</span>                 :             :     }</span>
+<span id="L388"><span class="lineNum">     388</span>                 :             : </span>
+<span id="L389"><span class="lineNum">     389</span>                 :             :     /**</span>
+<span id="L390"><span class="lineNum">     390</span>                 :             :      * @notice The most flexible sub-command. Allows the `owner()` to transfer amounts of `TOKEN0` and `TOKEN1`</span>
+<span id="L391"><span class="lineNum">     391</span>                 :             :      * to any `recipient` they want. Only works within the `modify` callback.</span>
+<span id="L392"><span class="lineNum">     392</span>                 :             :      * @param amount0 The amount of `TOKEN0` to transfer</span>
+<span id="L393"><span class="lineNum">     393</span>                 :             :      * @param amount1 The amount of `TOKEN1` to transfer</span>
+<span id="L394"><span class="lineNum">     394</span>                 :             :      * @param recipient Receives the transferred tokens</span>
+<span id="L395"><span class="lineNum">     395</span>                 :             :      */</span>
+<span id="L396"><span class="lineNum">     396</span>                 :<span class="tlaGNC">       12293 :     function transfer(uint256 amount0, uint256 amount1, address recipient) external onlyInModifyCallback {</span></span>
+<span id="L397"><span class="lineNum">     397</span>         [<span class="tlaGBC" title="Branch 0 was taken 8197 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 12293 times"> + </span>]:<span class="tlaGNC">       12293 :         if (amount0 &gt; 0) TOKEN0.safeTransfer(recipient, amount0);</span></span>
+<span id="L398"><span class="lineNum">     398</span>         [<span class="tlaGBC" title="Branch 0 was taken 4097 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 12293 times"> + </span>]:<span class="tlaGNC">       12293 :         if (amount1 &gt; 0) TOKEN1.safeTransfer(recipient, amount1);</span></span>
+<span id="L399"><span class="lineNum">     399</span>                 :             :     }</span>
+<span id="L400"><span class="lineNum">     400</span>                 :             : </span>
+<span id="L401"><span class="lineNum">     401</span>                 :             :     /**</span>
+<span id="L402"><span class="lineNum">     402</span>                 :             :      * @notice Allows the `owner()` to borrow funds from `LENDER0` and `LENDER1`. Only works within the `modify`</span>
+<span id="L403"><span class="lineNum">     403</span>                 :             :      * callback.</span>
+<span id="L404"><span class="lineNum">     404</span>                 :             :      * @dev If `amount0 &gt; 0` and interest hasn't yet accrued in this block for `LENDER0`, it will accrue</span>
+<span id="L405"><span class="lineNum">     405</span>                 :             :      * prior to processing your new borrow. Same goes for `amount1 &gt; 0` and `LENDER1`.</span>
+<span id="L406"><span class="lineNum">     406</span>                 :             :      * @param amount0 The amount of `TOKEN0` to borrow</span>
+<span id="L407"><span class="lineNum">     407</span>                 :             :      * @param amount1 The amount of `TOKEN1` to borrow</span>
+<span id="L408"><span class="lineNum">     408</span>                 :             :      * @param recipient Receives the borrowed tokens. Usually the address of this `Borrower` account.</span>
+<span id="L409"><span class="lineNum">     409</span>                 :             :      */</span>
+<span id="L410"><span class="lineNum">     410</span>                 :<span class="tlaGNC">       16406 :     function borrow(uint256 amount0, uint256 amount1, address recipient) external onlyInModifyCallback {</span></span>
+<span id="L411"><span class="lineNum">     411</span>         [<span class="tlaUNC" title="Branch 0 was not executed"> # </span><span class="tlaGBC" title="Branch 1 was taken 12298 times"> + </span>]:<span class="tlaGNC">       16406 :         if (amount0 &gt; 0) LENDER0.borrow(amount0, recipient);</span></span>
+<span id="L412"><span class="lineNum">     412</span>         [<span class="tlaUNC" title="Branch 0 was not executed"> # </span><span class="tlaGBC" title="Branch 1 was taken 8208 times"> + </span>]:<span class="tlaGNC">       16406 :         if (amount1 &gt; 0) LENDER1.borrow(amount1, recipient);</span></span>
+<span id="L413"><span class="lineNum">     413</span>                 :             :     }</span>
+<span id="L414"><span class="lineNum">     414</span>                 :             : </span>
+<span id="L415"><span class="lineNum">     415</span>                 :             :     /**</span>
+<span id="L416"><span class="lineNum">     416</span>                 :             :      * @notice Allows the `owner()` to repay debts to `LENDER0` and `LENDER1`. Only works within the `modify`</span>
+<span id="L417"><span class="lineNum">     417</span>                 :             :      * callback.</span>
+<span id="L418"><span class="lineNum">     418</span>                 :             :      * @dev This is technically unnecessary since you could call `Lender.repay` directly, specifying this</span>
+<span id="L419"><span class="lineNum">     419</span>                 :             :      * contract as the `beneficiary` and using the `transfer` sub-command to make payments. We include it</span>
+<span id="L420"><span class="lineNum">     420</span>                 :             :      * because it's convenient and gas-efficient for common use-cases.</span>
+<span id="L421"><span class="lineNum">     421</span>                 :             :      * @param amount0 The amount of `TOKEN0` to repay</span>
+<span id="L422"><span class="lineNum">     422</span>                 :             :      * @param amount1 The amount of `TOKEN1` to repay</span>
+<span id="L423"><span class="lineNum">     423</span>                 :             :      */</span>
+<span id="L424"><span class="lineNum">     424</span>                 :<span class="tlaGNC">           1 :     function repay(uint256 amount0, uint256 amount1) external onlyInModifyCallback {</span></span>
+<span id="L425"><span class="lineNum">     425</span>                 :<span class="tlaGNC">           1 :         _repay(amount0, amount1);</span></span>
+<span id="L426"><span class="lineNum">     426</span>                 :             :     }</span>
+<span id="L427"><span class="lineNum">     427</span>                 :             : </span>
+<span id="L428"><span class="lineNum">     428</span>                 :             :     /**</span>
+<span id="L429"><span class="lineNum">     429</span>                 :             :      * @notice Allows the `owner()` to withdraw their ante. Only works within the `modify` callback.</span>
+<span id="L430"><span class="lineNum">     430</span>                 :             :      * @param recipient Receives the ante (as Ether)</span>
+<span id="L431"><span class="lineNum">     431</span>                 :             :      */</span>
+<span id="L432"><span class="lineNum">     432</span>                 :<span class="tlaUNC tlaBgUNC">           0 :     function withdrawAnte(address payable recipient) external onlyInModifyCallback {</span></span>
+<span id="L433"><span class="lineNum">     433</span>                 :             :         // WARNING: External call to user-specified address</span>
+<span id="L434"><span class="lineNum">     434</span>                 :<span class="tlaUNC">           0 :         recipient.transfer(address(this).balance);</span></span>
+<span id="L435"><span class="lineNum">     435</span>                 :             :     }</span>
+<span id="L436"><span class="lineNum">     436</span>                 :             : </span>
+<span id="L437"><span class="lineNum">     437</span>                 :             :     /**</span>
+<span id="L438"><span class="lineNum">     438</span>                 :             :      * @notice Allows the `owner()` to perform arbitrary transfers. Useful for rescuing misplaced funds. Only</span>
+<span id="L439"><span class="lineNum">     439</span>                 :             :      * works within the `modify` callback.</span>
+<span id="L440"><span class="lineNum">     440</span>                 :             :      * @param token The ERC20 token to transfer</span>
+<span id="L441"><span class="lineNum">     441</span>                 :             :      * @param amount The amount to transfer</span>
+<span id="L442"><span class="lineNum">     442</span>                 :             :      * @param recipient Receives the transferred tokens</span>
+<span id="L443"><span class="lineNum">     443</span>                 :             :      */</span>
+<span id="L444"><span class="lineNum">     444</span>                 :<span class="tlaUNC">           0 :     function rescue(ERC20 token, uint256 amount, address recipient) external onlyInModifyCallback {</span></span>
+<span id="L445"><span class="lineNum">     445</span>                 :             :         // WARNING: External call to user-specified address</span>
+<span id="L446"><span class="lineNum">     446</span>                 :<span class="tlaUNC">           0 :         token.safeTransfer(recipient, amount);</span></span>
+<span id="L447"><span class="lineNum">     447</span>                 :             :     }</span>
+<span id="L448"><span class="lineNum">     448</span>                 :             : </span>
+<span id="L449"><span class="lineNum">     449</span>                 :             :     /*//////////////////////////////////////////////////////////////</span>
+<span id="L450"><span class="lineNum">     450</span>                 :             :                              BALANCE SHEET</span>
+<span id="L451"><span class="lineNum">     451</span>                 :             :     //////////////////////////////////////////////////////////////*/</span>
+<span id="L452"><span class="lineNum">     452</span>                 :             : </span>
+<span id="L453"><span class="lineNum">     453</span>                 :<span class="tlaGNC tlaBgGNC">           2 :     function getUniswapPositions() external view returns (int24[] memory) {</span></span>
+<span id="L454"><span class="lineNum">     454</span>                 :<span class="tlaGNC">           2 :         return extract(slot0);</span></span>
+<span id="L455"><span class="lineNum">     455</span>                 :             :     }</span>
+<span id="L456"><span class="lineNum">     456</span>                 :             : </span>
+<span id="L457"><span class="lineNum">     457</span>                 :             :     /**</span>
+<span id="L458"><span class="lineNum">     458</span>                 :             :      * @notice Summarizes all oracle data pertinent to account health</span>
+<span id="L459"><span class="lineNum">     459</span>                 :             :      * @dev If `seemsLegit == false`, you can call `Factory.pause` to temporarily disable borrows</span>
+<span id="L460"><span class="lineNum">     460</span>                 :             :      * @param oracleSeed The indices of `UNISWAP_POOL.observations` where we start our search for</span>
+<span id="L461"><span class="lineNum">     461</span>                 :             :      * the 30-minute-old (lowest 16 bits) and 60-minute-old (next 16 bits) observations when getting</span>
+<span id="L462"><span class="lineNum">     462</span>                 :             :      * TWAPs. If any of the highest 8 bits are set, we fallback to onchain binary search.</span>
+<span id="L463"><span class="lineNum">     463</span>                 :             :      * @return prices The probe prices currently being used to evaluate account health</span>
+<span id="L464"><span class="lineNum">     464</span>                 :             :      * @return seemsLegit Whether the Uniswap TWAP seems to have been manipulated or not</span>
+<span id="L465"><span class="lineNum">     465</span>                 :             :      */</span>
+<span id="L466"><span class="lineNum">     466</span>                 :<span class="tlaGNC">       12292 :     function getPrices(uint40 oracleSeed) public view returns (Prices memory prices, bool seemsLegit) {</span></span>
+<span id="L467"><span class="lineNum">     467</span>                 :<span class="tlaGNC">       61472 :         (, uint8 nSigma, uint8 manipulationThresholdDivisor, ) = FACTORY.getParameters(UNISWAP_POOL);</span></span>
+<span id="L468"><span class="lineNum">     468</span>                 :<span class="tlaGNC">       61472 :         (prices, seemsLegit) = _getPrices(oracleSeed, nSigma, manipulationThresholdDivisor);</span></span>
+<span id="L469"><span class="lineNum">     469</span>                 :             :     }</span>
+<span id="L470"><span class="lineNum">     470</span>                 :             : </span>
+<span id="L471"><span class="lineNum">     471</span>                 :<span class="tlaGNC">       90178 :     function _getPrices(</span></span>
+<span id="L472"><span class="lineNum">     472</span>                 :             :         uint40 oracleSeed,</span>
+<span id="L473"><span class="lineNum">     473</span>                 :             :         uint8 nSigma,</span>
+<span id="L474"><span class="lineNum">     474</span>                 :             :         uint8 manipulationThresholdDivisor</span>
+<span id="L475"><span class="lineNum">     475</span>                 :             :     ) private view returns (Prices memory prices, bool seemsLegit) {</span>
+<span id="L476"><span class="lineNum">     476</span>                 :<span class="tlaGNC">       90178 :         uint56 metric;</span></span>
+<span id="L477"><span class="lineNum">     477</span>                 :<span class="tlaGNC">       90178 :         uint256 iv;</span></span>
+<span id="L478"><span class="lineNum">     478</span>                 :             :         // compute current price and volatility</span>
+<span id="L479"><span class="lineNum">     479</span>                 :<span class="tlaGNC">       90178 :         (metric, prices.c, iv) = ORACLE.consult(UNISWAP_POOL, oracleSeed);</span></span>
+<span id="L480"><span class="lineNum">     480</span>                 :             :         // compute prices at which solvency will be checked</span>
+<span id="L481"><span class="lineNum">     481</span>                 :<span class="tlaGNC">       90178 :         (prices.a, prices.b, seemsLegit) = BalanceSheet.computeProbePrices(</span></span>
+<span id="L482"><span class="lineNum">     482</span>                 :             :             metric,</span>
+<span id="L483"><span class="lineNum">     483</span>                 :             :             prices.c,</span>
+<span id="L484"><span class="lineNum">     484</span>                 :             :             iv,</span>
+<span id="L485"><span class="lineNum">     485</span>                 :             :             nSigma,</span>
+<span id="L486"><span class="lineNum">     486</span>                 :             :             manipulationThresholdDivisor</span>
+<span id="L487"><span class="lineNum">     487</span>                 :             :         );</span>
+<span id="L488"><span class="lineNum">     488</span>                 :             :     }</span>
+<span id="L489"><span class="lineNum">     489</span>                 :             : </span>
+<span id="L490"><span class="lineNum">     490</span>                 :<span class="tlaGNC">       77886 :     function _getAssets(uint256 slot0_, Prices memory prices, bool withdraw) private returns (Assets memory assets) {</span></span>
+<span id="L491"><span class="lineNum">     491</span>                 :<span class="tlaGNC">       77886 :         assets.fixed0 = TOKEN0.balanceOf(address(this));</span></span>
+<span id="L492"><span class="lineNum">     492</span>                 :<span class="tlaGNC">       77886 :         assets.fixed1 = TOKEN1.balanceOf(address(this));</span></span>
+<span id="L493"><span class="lineNum">     493</span>                 :             : </span>
+<span id="L494"><span class="lineNum">     494</span>                 :<span class="tlaGNC">       77886 :         int24[] memory positions = extract(slot0_);</span></span>
+<span id="L495"><span class="lineNum">     495</span>                 :<span class="tlaGNC">       77886 :         uint256 count = positions.length;</span></span>
+<span id="L496"><span class="lineNum">     496</span>                 :             :         unchecked {</span>
+<span id="L497"><span class="lineNum">     497</span>                 :<span class="tlaGNC">       77886 :             for (uint256 i; i &lt; count; i += 2) {</span></span>
+<span id="L498"><span class="lineNum">     498</span>                 :             :                 // Load lower and upper ticks from the `positions` array</span>
+<span id="L499"><span class="lineNum">     499</span>                 :<span class="tlaGNC">           8 :                 int24 l = positions[i];</span></span>
+<span id="L500"><span class="lineNum">     500</span>                 :<span class="tlaGNC">           8 :                 int24 u = positions[i + 1];</span></span>
+<span id="L501"><span class="lineNum">     501</span>                 :             :                 // Fetch amount of `liquidity` in the position</span>
+<span id="L502"><span class="lineNum">     502</span>                 :<span class="tlaGNC">           8 :                 (uint128 liquidity, , , , ) = UNISWAP_POOL.positions(keccak256(abi.encodePacked(address(this), l, u)));</span></span>
+<span id="L503"><span class="lineNum">     503</span>                 :             : </span>
+<span id="L504"><span class="lineNum">     504</span>         [<span class="tlaUNC" title="Branch 0 was not executed"> # </span><span class="tlaGBC" title="Branch 1 was taken 8 times"> + </span>]:<span class="tlaGNC">           8 :                 if (liquidity == 0) continue;</span></span>
+<span id="L505"><span class="lineNum">     505</span>                 :             : </span>
+<span id="L506"><span class="lineNum">     506</span>                 :             :                 // Compute lower and upper sqrt ratios</span>
+<span id="L507"><span class="lineNum">     507</span>                 :<span class="tlaGNC">           8 :                 uint160 L = TickMath.getSqrtRatioAtTick(l);</span></span>
+<span id="L508"><span class="lineNum">     508</span>                 :<span class="tlaGNC">           8 :                 uint160 U = TickMath.getSqrtRatioAtTick(u);</span></span>
+<span id="L509"><span class="lineNum">     509</span>                 :             : </span>
+<span id="L510"><span class="lineNum">     510</span>                 :             :                 // Compute the value of `liquidity` (in terms of token1) at both probe prices</span>
+<span id="L511"><span class="lineNum">     511</span>                 :<span class="tlaGNC">           8 :                 assets.fluid1A += LiquidityAmounts.getValueOfLiquidity(prices.a, L, U, liquidity);</span></span>
+<span id="L512"><span class="lineNum">     512</span>                 :<span class="tlaGNC">           8 :                 assets.fluid1B += LiquidityAmounts.getValueOfLiquidity(prices.b, L, U, liquidity);</span></span>
+<span id="L513"><span class="lineNum">     513</span>                 :             : </span>
+<span id="L514"><span class="lineNum">     514</span>                 :             :                 // Compute what amounts underlie `liquidity` at the current TWAP</span>
+<span id="L515"><span class="lineNum">     515</span>                 :<span class="tlaGNC">           8 :                 (uint256 amount0, uint256 amount1) = LiquidityAmounts.getAmountsForLiquidity(prices.c, L, U, liquidity);</span></span>
+<span id="L516"><span class="lineNum">     516</span>                 :<span class="tlaGNC">           8 :                 assets.fluid0C += amount0;</span></span>
+<span id="L517"><span class="lineNum">     517</span>                 :<span class="tlaGNC">           8 :                 assets.fluid1C += amount1;</span></span>
+<span id="L518"><span class="lineNum">     518</span>                 :             : </span>
+<span id="L519"><span class="lineNum">     519</span>         [<span class="tlaGBC" title="Branch 0 was taken 4 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 4 times"> + </span>]:<span class="tlaGNC">           8 :                 if (!withdraw) continue;</span></span>
+<span id="L520"><span class="lineNum">     520</span>                 :             : </span>
+<span id="L521"><span class="lineNum">     521</span>                 :             :                 // Withdraw all `liquidity` from the position</span>
+<span id="L522"><span class="lineNum">     522</span>                 :<span class="tlaGNC">           4 :                 _uniswapWithdraw(l, u, liquidity, address(this));</span></span>
+<span id="L523"><span class="lineNum">     523</span>                 :             :             }</span>
+<span id="L524"><span class="lineNum">     524</span>                 :             :         }</span>
+<span id="L525"><span class="lineNum">     525</span>                 :             :     }</span>
+<span id="L526"><span class="lineNum">     526</span>                 :             : </span>
+<span id="L527"><span class="lineNum">     527</span>                 :<span class="tlaGNC">       77887 :     function _getLiabilities() private view returns (uint256 amount0, uint256 amount1) {</span></span>
+<span id="L528"><span class="lineNum">     528</span>                 :<span class="tlaGNC">       77887 :         amount0 = LENDER0.borrowBalanceStored(address(this));</span></span>
+<span id="L529"><span class="lineNum">     529</span>                 :<span class="tlaGNC">       77887 :         amount1 = LENDER1.borrowBalanceStored(address(this));</span></span>
+<span id="L530"><span class="lineNum">     530</span>                 :             :     }</span>
+<span id="L531"><span class="lineNum">     531</span>                 :             : </span>
+<span id="L532"><span class="lineNum">     532</span>                 :             :     /*//////////////////////////////////////////////////////////////</span>
+<span id="L533"><span class="lineNum">     533</span>                 :             :                                  HELPERS</span>
+<span id="L534"><span class="lineNum">     534</span>                 :             :     //////////////////////////////////////////////////////////////*/</span>
+<span id="L535"><span class="lineNum">     535</span>                 :             : </span>
+<span id="L536"><span class="lineNum">     536</span>                 :<span class="tlaGNC">           5 :     function _uniswapWithdraw(</span></span>
+<span id="L537"><span class="lineNum">     537</span>                 :             :         int24 lower,</span>
+<span id="L538"><span class="lineNum">     538</span>                 :             :         int24 upper,</span>
+<span id="L539"><span class="lineNum">     539</span>                 :             :         uint128 liquidity,</span>
+<span id="L540"><span class="lineNum">     540</span>                 :             :         address recipient</span>
+<span id="L541"><span class="lineNum">     541</span>                 :             :     ) private returns (uint256 burned0, uint256 burned1, uint256 collected0, uint256 collected1) {</span>
+<span id="L542"><span class="lineNum">     542</span>                 :<span class="tlaGNC">           5 :         (burned0, burned1) = UNISWAP_POOL.burn(lower, upper, liquidity);</span></span>
+<span id="L543"><span class="lineNum">     543</span>                 :<span class="tlaGNC">           5 :         (collected0, collected1) = UNISWAP_POOL.collect(recipient, lower, upper, type(uint128).max, type(uint128).max);</span></span>
+<span id="L544"><span class="lineNum">     544</span>                 :             :     }</span>
+<span id="L545"><span class="lineNum">     545</span>                 :             : </span>
+<span id="L546"><span class="lineNum">     546</span>                 :<span class="tlaGNC">       24591 :     function _repay(uint256 amount0, uint256 amount1) private {</span></span>
+<span id="L547"><span class="lineNum">     547</span>         [<span class="tlaUNC" title="Branch 0 was not executed"> # </span><span class="tlaGBC" title="Branch 1 was taken 12300 times"> + </span>]:<span class="tlaGNC">       24591 :         if (amount0 &gt; 0) {</span></span>
+<span id="L548"><span class="lineNum">     548</span>                 :<span class="tlaGNC">       12300 :             TOKEN0.safeTransfer(address(LENDER0), amount0);</span></span>
+<span id="L549"><span class="lineNum">     549</span>                 :<span class="tlaGNC">       12300 :             LENDER0.repay(amount0, address(this));</span></span>
+<span id="L550"><span class="lineNum">     550</span>                 :             :         }</span>
+<span id="L551"><span class="lineNum">     551</span>         [<span class="tlaUNC" title="Branch 0 was not executed"> # </span><span class="tlaGBC" title="Branch 1 was taken 8201 times"> + </span>]:<span class="tlaGNC">       24591 :         if (amount1 &gt; 0) {</span></span>
+<span id="L552"><span class="lineNum">     552</span>                 :<span class="tlaGNC">        8201 :             TOKEN1.safeTransfer(address(LENDER1), amount1);</span></span>
+<span id="L553"><span class="lineNum">     553</span>                 :<span class="tlaGNC">        8201 :             LENDER1.repay(amount1, address(this));</span></span>
+<span id="L554"><span class="lineNum">     554</span>                 :             :         }</span>
+<span id="L555"><span class="lineNum">     555</span>                 :             :     }</span>
+<span id="L556"><span class="lineNum">     556</span>                 :             : }</span>
+        </pre>
+              </td>
+            </tr>
+          </table>
+          <br>
+
+          <table width="100%" border=0 cellspacing=0 cellpadding=0>
+            <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+            <tr><td class="versionInfo">Generated by: <a href="https://github.com//linux-test-project/lcov" target="_parent">LCOV version 2.0-1</a></td></tr>
+          </table>
+          <br>
+
+</body>
+</html>
