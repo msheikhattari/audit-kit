@@ -14,7 +14,7 @@ When generating test coverage files, the instrumentaton causes stack too deep in
 
 The test.sh file contains 5 files which are excluded when generating coverage files: "test/libraries/Oracle.t.sol", "test/libraries/Volatility.t.sol", "test/invariants/LenderHarness.t.sol", "test/invariants/LenderInvariants.t.sol", and "test/VolatilityOracle.t.sol". While these are all test files rather than critical protocol code, the auditors should keep in mind that they are excluded from the coverage report. The coverage report is included under the 'coverage' folder.
 
-Included are overviews of the coverage information:
+Included are images which capture the overall coverage information:
 - Overview
 ![Overview](lcov-overview.png "Overview")
 - Libraries
