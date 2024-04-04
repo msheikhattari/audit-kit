@@ -42,6 +42,7 @@ There are a few other functions which are either untested or missing a large num
 The remaining contracts had few missing branches, which can be referenced in the coverage report and tested if there is time. Invariant tests are also suggested in the lender contract to ensure assets > liabilities after any action, or when there is a liquidation, assets < liabilities always. State changes should always be consistent between borrower/lender markets as well, for example available liquidity should always accurately reflect borrower deposits.
 
 # Automated Results
+Issues were created for each vulnerability and false positive in GitHub. These bugs are also included here for completeness.
 ## Valid issues
 ### Low
 1. **Missing zero address check when withdrawing funds can result in loss of funds.** Found in /Borrower.sol#432-435, this is not a high severity vulnerability given it is access-controlled.
@@ -67,7 +68,7 @@ The remaining contracts had few missing branches, which can be referenced in the
 4. 'Too many digits: Literals with many digits are difficult to read and review.' 5/6 instances excluded. 
     All of the excluded cases involve 64 bit hexadecimal numbers which will not realistically be read manually. This filter should be adjusted to only flag decimals having this issue. 
 5. 'Reentrancy (no eth): Detection of reentrancy bugs that do not involve Ether.' 4/4 instances excluded.
-    None of the cases involving reentrancy were deemed valid, either because they involved integration with external contracts like Uniswap (with no room for arbitrary call data or reentering the contract), or because the state variables written after the call were not exploitable (for example, involving a vault share balance). This flag may give auditors a prelimenary idea of where to start looking for reentrancy attack vectors, but its usefulness is questionable, as it will inherently result in a large volume of false positives. 
+    None of the cases involving reentrancy were deemed valid, either because they involved integration with external contracts like Uniswap (with no room for arbitrary call data or reentering the contract), or because the state variables written after the call were not exploitable (for example, involving a vault share balance). This flag may give auditors a preliminary idea of where to start looking for reentrancy attack vectors, but its usefulness is questionable, as it will inherently result in a large volume of false positives. 
 6. 'Reentrancy (benign): Detection of reentrancy bugs that only act as a double call.' 2/2 instances excluded. 
     There is no reason to consider issues without any attack vector. Consider removal of this filter. 
 7. 'Incorrect-shift: Detect if the values in a shift operation are reversed.' 1/1 instances excluded. 
