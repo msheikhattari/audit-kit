@@ -1,12 +1,18 @@
 # Compilation and Testing
 ### Compilation
-Contract compilation can be expected to take 10+ minutes. According to the team, this is expected. via-ir was enabled and in fact necessary, as a stack error is thrown otherwise. The maximum number of optimization steps were used. The team noted that if the number of optimizations are turned down it may be faster, though the bytecode being tested against could differ from prod. Recommended course of action: give the contracts time to compile, rather than making any changes. Analyst found that it took roughly 22 minutes to compile all of the contracts.
+Contract compilation can be expected to take 10+ minutes. According to the team, this is expected. via-ir was enabled and in fact necessary, as a stack error is thrown otherwise. The maximum number of optimization steps were used. The team noted that if the number of optimizations are turned down it may be faster, though the bytecode being tested against could differ from prod. 
+![Known compilation issue](hayden-compile.png "Known compilation issue")
+
+Recommended course of action: give the contracts time to compile, rather than making any changes. Analyst found that it took roughly 22 minutes to compile all of the contracts.
 
 ### Testing
 After contract compilation, it took about 10 minutes to run the 172 tests in the testing suite. Some tests take substantially longer than others to run, so the use of --match-test or --match-contract flags is advised. Initial testing resulted in 11 failing tests. Nine of the tests were failing due to uninitialized environment variables. Create a .env file in aloe-ii/core, with the following variables defined: RPC_URL_OPTIMISM and RPC_URL_MAINNET. The other 2 failing tests were resulting from foundry's ffi cheatcode, which requires the --ffi flag, so it's recommended to include this when running the tests.
 
 ### Coverage
-When generating test coverage files, the instrumentaton causes stack too deep in a few files. Some of the files were excluded before trying to get coverage, and the team mentions that this is to be expected. The test.sh file contains 5 files which are excluded when generating coverage files: "test/libraries/Oracle.t.sol", "test/libraries/Volatility.t.sol", "test/invariants/LenderHarness.t.sol", "test/invariants/LenderInvariants.t.sol", and "test/VolatilityOracle.t.sol". While these are all test files rather than critical protocol code, the auditors should keep in mind that they are excluded from the coverage report. The coverage report is included under the 'coverage' folder.
+When generating test coverage files, the instrumentaton causes stack too deep in a few files. Some of the files were excluded before trying to get coverage, and the team mentions that this is to be expected. 
+![Known coverage issue](hayden-coverage.png "Known coverage issue")
+
+The test.sh file contains 5 files which are excluded when generating coverage files: "test/libraries/Oracle.t.sol", "test/libraries/Volatility.t.sol", "test/invariants/LenderHarness.t.sol", "test/invariants/LenderInvariants.t.sol", and "test/VolatilityOracle.t.sol". While these are all test files rather than critical protocol code, the auditors should keep in mind that they are excluded from the coverage report. The coverage report is included under the 'coverage' folder.
 
 Included are overviews of the coverage information:
 - Overview
@@ -15,6 +21,10 @@ Included are overviews of the coverage information:
 ![Libraries](lcov-libraries.png "Libraries")
 - src
 ![src](lcov-src.png "src")
+
+Additionally, warnings were given for an unknown category in VolatilityOracle.sol while generating the html from the coverage report. The coverage report was manually inspected, and no issues were found, though the auditor should be made aware of this in case there is a deeper underlying issue.
+![Unknown categories](coverage-issues.png "Unkown categories")
+
 
 ### Suggested tests
 Based on the coverage report, there is great variation in testing coverage dependant on the contract. For example, the /libraries/Rewards.sol contract has 100% code coverage, likely owing to the fact that all 10 functions are tested and they don't have many branches. Further, contracts like /libraries/TickMath.sol have 92.9% coverage rather than the full 100%, missing coverage is in an unusued function `ceil(int24 tick, int24 tickSpacing)`, as well as a few of the various if statements involving the tick (lines 81-99). In the former case, a simple unit test for the ceil function would ensure its functionality, and a fuzz test for the tick, where each of the 19 bits is nonzero atleast once, would clear up the missing branch coverage.
