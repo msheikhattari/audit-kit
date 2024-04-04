@@ -8,10 +8,13 @@ After contract compilation, it took about 10 minutes to run the 172 tests in the
 ### Coverage
 When generating test coverage files, the instrumentaton causes stack too deep in a few files. Some of the files were excluded before trying to get coverage, and the team mentions that this is to be expected. The test.sh file contains 5 files which are excluded when generating coverage files: "test/libraries/Oracle.t.sol", "test/libraries/Volatility.t.sol", "test/invariants/LenderHarness.t.sol", "test/invariants/LenderInvariants.t.sol", and "test/VolatilityOracle.t.sol". While these are all test files rather than critical protocol code, the auditors should keep in mind that they are excluded from the coverage report. The coverage report is included under the 'coverage' folder.
 
-Overall coverage rate:
-  lines......: 80.6% (654 of 811 lines)
-  functions......: 80.3% (122 of 152 functions)
-  branches......: 64.2% (170 of 265 branches)
+Included are overviews of the coverage information:
+- Overview
+![Overview](lcov-overview.png "Overview")
+- Libraries
+![Libraries](lcov-libraries.png "Libraries")
+- src
+![src](lcov-src.png "src")
 
 ### Suggested tests
 Based on the coverage report, there is great variation in testing coverage dependant on the contract. For example, the /libraries/Rewards.sol contract has 100% code coverage, likely owing to the fact that all 10 functions are tested and they don't have many branches. Further, contracts like /libraries/TickMath.sol have 92.9% coverage rather than the full 100%, missing coverage is in an unusued function `ceil(int24 tick, int24 tickSpacing)`, as well as a few of the various if statements involving the tick (lines 81-99). In the former case, a simple unit test for the ceil function would ensure its functionality, and a fuzz test for the tick, where each of the 19 bits is nonzero atleast once, would clear up the missing branch coverage.
