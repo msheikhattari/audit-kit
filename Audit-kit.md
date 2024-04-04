@@ -115,6 +115,10 @@ Some parts of the protocol are less error-prone than others. The parts of the pr
 Likewise, cross-contract interactions in the protocol are explicitly referenced by the team as being a potential issue. Particularly, interactions between lender, borrower, and factory, such as explicit callbacks like Lender's flash loans and Borrower's modify or rescue. 
 
 # Potential Vulnerability
+This bug has been invalidated by a [PoC](https://github.com/msheikhattari/allo-PoC/blob/main/test/PoCTest.sol). The Factory.sol contract (0x95110C9806833d3D3C250112fac73c5A6f631E80) was forked on optimism. If this bug were valid, it would qualify as a critical vulnerability in their ImmuneFi bug bounty program. 
+
+The vulnerability was avoided due to the use of cached values, specifically by caching asset.balanceOf(address(this)) during the most recent deposit. The original assumption was that `inventory` represented the live asset balance of the contract. However, any transfers made between deposits will not affect this cached balance.
+
 /Ledger.sol#375, /Ledger.sol#385
 
 The use of the totalSupply == 0 checks in _convertToShares and _convertToAssets can result in a vault share manipulation attack, where an attacker can frontrun the first deposit to cause loss or theft of this deposit. The attacker can first deposit 2 wei to get 2 shares, then send the half of the victim's deposit directly to the contract. In turn, the victim will then get 1 share due to the calculation shares = amount * totalSupply / address(this).balance, as address(this).balance will be 1 wei greater than the numerator, so it will round down to 1 due to truncation of integer division. This will entitle the attacker to half of the victim's deposit, though by changing the ratio of the victim's deposit sent to the contract (and correspondingly changing the number of wei of shares to mint), any fraction of the deposit can be stolen.
